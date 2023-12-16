@@ -16,6 +16,7 @@ L=11; % number of lines
 Sbase=mpc.baseMVA;  % unit:VA
 d = mpc.bus(:,3)/Sbase;
 g_N_thermal = mpc.gen(:,9)/Sbase; %火电机组容量
+p_max = 1.5;%线路传输功率上限
 M = 1e5;
 
 %% Nodal Y Matrix→B matrix
@@ -39,6 +40,7 @@ Cons_DC=[
     -(1-x)*M <= In'*theta - p.* X <= (1-x)*M,
     In*p==g-d;
     theta(1)==0,
+    -x.*p_max <= p <=x.*p_max;
 ];
 
 Cons=[Cons, Cons_DC];
