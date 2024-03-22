@@ -7,12 +7,15 @@ clc
 
 %没有线路参数
 u1 = 1;%常规火电机组及其他类型发电机组
+U_cp=5; 
+U_np=1;
+U_hp=2;
 u2 = 1;%新建常规
 u3 = 1;%新建碳捕集预留CCR
 u4 = 1;%新建碳捕集机组CCS
 u5 = 1;%常规改造
 u6 = 1;%CCR改造
-Y = 0;%第y年
+Y = 5;%第y年
 i_rate = 0.08;%贴现率
 n_age = 25;%机组运行年限
 A = 0.25;%典型日d典型时段t的权重系数因子
@@ -25,7 +28,10 @@ C_INV = 0;%初始化投资成本
 
 %% *********** Variable statement **********
 %投资决策变量
-M_B = binvar(u1,Y);%常规火电机组及其他类型发电机组
+M_B = binvar(U_cp+U_hp+U_np,Y);%常规火电机组及其他类型发电机组
+Cons=[];
+Cons = [Cons, sum(M_B,2)<=1];
+
 M_BN = binvar(u2,Y);%新建常规
 M_BR = binvar(u3,Y);%新建碳捕集预留CCR
 M_BP = binvar(u4,Y);%新建碳捕集机组CCS
@@ -33,9 +39,9 @@ M_RN = binvar(u5,Y);%常规改造
 M_RR = binvar(u6,Y);%CCR改造
 
 %投资状态变量(5-1)
-I_B = zeros(u1, Y);
-for i = 1:u1
-    I_B(i,Y) = sum(M_B(i, 1:y_1));
+I_B = sdpvar(U_cp, Y);
+for i = 1:U_cp
+    Cons=[Cons,I_B(i,Y) == sum(M_B(i, 1:y_1))];
 end
 
 I_BN = zeros(u2,Y);
@@ -76,7 +82,11 @@ for y = 1:Y
 end
 %以电源投资费用与规划期内系统运行成本之和最小为目标函数(5-2)
 Obj = C_INV + C_OPE;
-Cons = [];
+for i=1:N
+    Cons = [Cons, sum(M_B,1)<=1];
+    Cons = [Cons, sum(M_B(i, 1:y_1))<=1];
+end
+Cons = [Cons, sum(M_B,2)<=1];
 
 %% *********** Solve the problem ***********
 ops=sdpsettings('verbose',2,'solver','gurobi');
