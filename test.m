@@ -125,12 +125,16 @@ Obj_u = 0;
 Obj_up = 0;
 Obj_down = 0;
 Obj_ope = sdpvar(1,Hours);
+Obj_shed = sdpvar(1,Hours);
+Obj_g_exist = sdpvar(1,Hours);
 Cons = [Cons,sum_type_g(:,1,:) == sum(g_coal_1,2)];
 Cons = [Cons,sum_type_g(:,2,:) == sum(g_coal_2,2)];
 Cons = [Cons,sum_type_g(:,3,:) == sum(g_coal_3,2)];
 Cons = [Cons,sum_type_g(:,4,:) == sum(g_coal_4,2)];
 for t = 1:Hours
-    Obj_ope(1,t) = M * sum(pd_shed(:,t)) + sum(c2.*g_exist(1:3,t).^2 + c1.*g_exist(1:3,t));%原有机组发电成本
+    Obj_shed(1,t) = M * sum(pd_shed(:,t));
+    Obj_g_exist(1,t) = sum(c2 .* g_exist(1:3,t).^2 + c1 .* g_exist(1:3,t));
+    Obj_ope(1,t) = Obj_shed(1,t) + Obj_g_exist(1,t);%原有机组发电成本
     %新增机组发电成本
     for i = 1:N
         Obj_ope(1,t) = Obj_ope(1,t) + sum(c2_all.*sum_type_g(i,:,t).^2 + c1_all.*sum_type_g(i,:,t));
@@ -216,6 +220,7 @@ s_g_exist = value(g_exist);
 s_Obj = value(Obj);
 s_Obj_inv = value(Obj_inv);
 s_Obj_ope = value(Obj_ope);
+s_Obj_shed = value(Obj_shed);
 
 figure
 h2 = plot(G, 'Layout', 'force', 'EdgeColor', 'k', 'NodeColor', 'b', 'MarkerSize', 8);
@@ -226,15 +231,15 @@ highlight(h2,I(l_new),J(l_new),'LineStyle','--','LineWidth',3,'EdgeColor','g'); 
 title('规划结果');
 
 for t = 1:Hours
-    Obj_ope = M*sum(pd_shed(:,t))+sum(c2.*g_exist(1:3,t).*2+c1.*g_exist(1:3,t));%原有机组发电成本
-    %新增机组发电成本
-    for i=1:3
-        Obj_ope= Obj_ope+sum(c2_all .* sum_type_g(i,:,t).*2+c1_all .* sum_type_g(i,:,t));
-        Obj_u=Obj_u+sum(Cu_NL.*u(i,:,t));
-        Obj_up=Obj_up+sum(Cup.*v(i,:,t));
-        Obj_down=Obj_down+sum(Cdown.*w(i,:,t));
-    end
-    fprintf('时段 %d 运行成本: %.2f\n', t, value(Obj_ope));
+    % s_Obj_ope = M*sum(pd_shed(:,t))+sum(c2.*g_exist(1:3,t).*2+c1.*g_exist(1:3,t));%原有机组发电成本
+    % %新增机组发电成本
+    % for i=1:3
+    %     Obj_ope= Obj_ope+sum(c2_all .* sum_type_g(i,:,t).*2+c1_all .* sum_type_g(i,:,t));
+    %     Obj_u=Obj_u+sum(Cu_NL.*u(i,:,t));
+    %     Obj_up=Obj_up+sum(Cup.*v(i,:,t));
+    %     Obj_down=Obj_down+sum(Cdown.*w(i,:,t));
+    % end
+    fprintf('时段 %d 运行成本: %.2f\n', t, value(s_Obj_ope(:,t)));
 end
 
 %% 画运行结果图，输出不同时间段的运行成本
