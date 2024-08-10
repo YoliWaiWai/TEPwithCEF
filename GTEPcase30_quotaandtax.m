@@ -58,10 +58,10 @@ cost =     [0.3171,0.3171,0.2856,0.2856] * 1e5;   % 运行成本 单位：元/kW
 cost_ccs = [0.4134,0.3973,0.3747,0.3694] * 1e5;   % 运行成本 单位：元/kWh
 cost_gas = [0.432,0.396,0.360,0.324] * 1e5;
 % 碳排放强度 单位：t/MWh
-cei =     [0.905,0.856,0.772,0.746] * 1e2;        
+cei =     [0.905,0.856,0.772,0.746] * 1e2;
 cei_ccs = [0.113,0.108,0.098,0.093] * 1e2;
 cei_gas = [0.45,0.44,0.42,0.41] * 1e2;
-%year         1     2    3     4    5    6    7    8    9    10    11    12    13    14    15  
+%year         1     2    3     4    5    6    7    8    9    10    11    12    13    14    15
 carbon_tax = [120 126 132 138 145 151 157 160 164 168 172 175 178 181 184];         % 碳税﻿ 单位：元/tCO2
 carbon_quota_1 = [0.8218 0.8177 0.7861 0.7822 0.778 0.774 0.770 0.766 0.762 0.758 0.754 0.750 0.746 0.742 0.738]* 1e2;%300MW等级以上常规燃煤机组
 carbon_quota_2 = [0.8773 0.8729 0.7984 0.7944 0.79  0.786 0.782 0.778 0.774 0.77  0.766 0.762 0.758 0.754 0.75]* 1e2;%300MW等级以下常规燃煤机组
@@ -69,38 +69,38 @@ carbon_quota_gas = [0.3920 0.3901 0.3305 0.3288 0.3262 0.3240 0.3185 0.3164 0.31
 for y = 1:Years
     for i = 1
         if cei(i)>carbon_quota_2(y)
-           costofcarbon_coal(i,y) =  (cei(i)-carbon_quota_2(y)) * carbon_tax(y);
+            costofcarbon_coal(i,y) =  (cei(i)-carbon_quota_2(y)) * carbon_tax(y);
         else
-           costofcarbon_coal(i,y) =  (cei(i)-carbon_quota_2(y)) * 92.6;
+            costofcarbon_coal(i,y) =  (cei(i)-carbon_quota_2(y)) * 92.6;
         end
         if cei_ccs(i)>carbon_quota_2(y)
-           costofcarbon_ccs(i,y) =  (cei_ccs(i)-carbon_quota_2(y)) * carbon_tax(y);
+            costofcarbon_ccs(i,y) =  (cei_ccs(i)-carbon_quota_2(y)) * carbon_tax(y);
         else
-           costofcarbon_ccs(i,y) =  (cei_ccs(i)-carbon_quota_2(y)) * 92.6;
+            costofcarbon_ccs(i,y) =  (cei_ccs(i)-carbon_quota_2(y)) * 92.6;
         end
         if cei_gas(i)>carbon_quota_gas(y)
-           costofcarbon_gas(i,y) =  (cei_gas(i)-carbon_quota_gas(y)) * carbon_tax(y);
+            costofcarbon_gas(i,y) =  (cei_gas(i)-carbon_quota_gas(y)) * carbon_tax(y);
         else
-           costofcarbon_gas(i,y) =  (cei_gas(i)-carbon_quota_gas(y)) * 92.6;
+            costofcarbon_gas(i,y) =  (cei_gas(i)-carbon_quota_gas(y)) * 92.6;
         end
-    end 
+    end
     for i = 2:4
         if cei(i)>carbon_quota_1(y)
-           costofcarbon_coal(i,y) =  (cei(i)-carbon_quota_1(y)) * carbon_tax(y);
+            costofcarbon_coal(i,y) =  (cei(i)-carbon_quota_1(y)) * carbon_tax(y);
         else
-           costofcarbon_coal(i,y) =  (cei(i)-carbon_quota_1(y)) * 92.6;
+            costofcarbon_coal(i,y) =  (cei(i)-carbon_quota_1(y)) * 92.6;
         end
         if cei_ccs(i)>carbon_quota_1(y)
-           costofcarbon_ccs(i,y) =  (cei_ccs(i)-carbon_quota_1(y)) * carbon_tax(y);
+            costofcarbon_ccs(i,y) =  (cei_ccs(i)-carbon_quota_1(y)) * carbon_tax(y);
         else
-           costofcarbon_ccs(i,y) =  (cei_ccs(i)-carbon_quota_1(y)) * 92.6;
+            costofcarbon_ccs(i,y) =  (cei_ccs(i)-carbon_quota_1(y)) * 92.6;
         end
         if cei_gas(i)>carbon_quota_gas(y)
-           costofcarbon_gas(i,y) =  (cei_gas(i)-carbon_quota_gas(y)) * carbon_tax(y);
+            costofcarbon_gas(i,y) =  (cei_gas(i)-carbon_quota_gas(y)) * carbon_tax(y);
         else
-           costofcarbon_gas(i,y) =  (cei_gas(i)-carbon_quota_gas(y)) * 92.6;
+            costofcarbon_gas(i,y) =  (cei_gas(i)-carbon_quota_gas(y)) * 92.6;
         end
-    end 
+    end
 end
 
 
@@ -339,23 +339,23 @@ for y = 1:Years
         Cons = [Cons,- I_lines(:,y) .* p_max <= p(:,h,y)];%线路容量下限
         Cons = [Cons,p(:,h,y) <= I_lines(:,y) .* p_max];%线路容量上限
         Cons = [Cons,P_load(:,h,y) >= pd_shed(:,h,y) >= 0];
-        
+
     end
 end
 %下面这个循环是为了保证规划结果便于观测，无物理意义
 for j = 2:x_coal_max(1)
-        Cons = [Cons, x_gen_coal_1(:,j,:) <= x_gen_coal_1(:,j-1,:)];
+    Cons = [Cons, x_gen_coal_1(:,j,:) <= x_gen_coal_1(:,j-1,:)];
 end
 for j = 2:x_coal_max(2)
-        Cons = [Cons, x_gen_coal_2(:,j,:) <= x_gen_coal_2(:,j-1,:)];
+    Cons = [Cons, x_gen_coal_2(:,j,:) <= x_gen_coal_2(:,j-1,:)];
 end
 for j = 2:x_coal_max(4)
-        Cons = [Cons, x_gen_coal_4(:,j,:) <= x_gen_coal_4(:,j-1,:)];
+    Cons = [Cons, x_gen_coal_4(:,j,:) <= x_gen_coal_4(:,j-1,:)];
 end
 %% Cons2: 机组发电功率约束
 % 原有机组
 Cons = [Cons, g_exist(gen_c,:,:) == 0];%初始条件
-Cons = [Cons,g_min_all(1) <= g_exist(gen_node,:,:)]; 
+Cons = [Cons,g_min_all(1) <= g_exist(gen_node,:,:)];
 Cons = [Cons,g_exist(gen_node,:,:)<= g_max_all(1)] ;
 % 新增机组
 for i=1:N
@@ -404,49 +404,49 @@ end
 Obj_inv = 0;
 for year = 1:Years
     Obj_inv = Obj_inv + sum(c_lines .* x_lines(:,year));
-        for i = 1:N
-            for t = year:Years
-                %常规燃煤机组
-                for j = 1:size(x_gen_coal_1, 2)
-                    Obj_inv = Obj_inv + A_gen(1) * I_gen_coal_1(i, j, year) / (1 + r)^(t - year);
-                end
-                for j = 1:size(x_gen_coal_2, 2)
-                    Obj_inv = Obj_inv + A_gen(2) * I_gen_coal_2(i, j, year) / (1 + r)^(t - year);
-                end
-                for j = 1:size(x_gen_coal_3, 2)
-                    Obj_inv = Obj_inv + A_gen(3) * I_gen_coal_3(i, j, year) / (1 + r)^(t - year);
-                end
-                for j = 1:size(x_gen_coal_4, 2)
-                    Obj_inv = Obj_inv + A_gen(4) * I_gen_coal_4(i, j, year) / (1 + r)^(t - year);
-                end
-                %碳捕集机组
-                for j = 1:size(x_gen_coal_1, 2)
-                    Obj_inv = Obj_inv + A_ccs(1) * I_gen_ccs_1(i, j, year) / (1 + r)^(t - year);
-                end
-                for j = 1:size(x_gen_coal_2, 2)
-                    Obj_inv = Obj_inv + A_ccs(2) * I_gen_ccs_2(i, j, year) / (1 + r)^(t - year);
-                end
-                for j = 1:size(x_gen_coal_3, 2)
-                    Obj_inv = Obj_inv + A_ccs(3) * I_gen_ccs_3(i, j, year) / (1 + r)^(t - year);
-                end
-                for j = 1:size(x_gen_coal_4, 2)
-                    Obj_inv = Obj_inv + A_ccs(4) * I_gen_ccs_4(i, j, year) / (1 + r)^(t - year);
-                end
-                %燃气机组
-                   for j = 1:size(x_gen_gas_1, 2)
-                    Obj_inv = Obj_inv + A_gas(1) * I_gen_gas_1(i, j, year) / (1 + r)^(t - year);
-                end
-                for j = 1:size(x_gen_gas_2, 2)
-                    Obj_inv = Obj_inv + A_gas(2) * I_gen_gas_2(i, j, year) / (1 + r)^(t - year);
-                end
-                for j = 1:size(x_gen_gas_3, 2)
-                    Obj_inv = Obj_inv + A_gas(3) * I_gen_gas_3(i, j, year) / (1 + r)^(t - year);
-                end
-                for j = 1:size(x_gen_gas_4, 2)
-                    Obj_inv = Obj_inv + A_gas(4) * I_gen_gas_4(i, j, year) / (1 + r)^(t - year);
-                end
+    for i = 1:N
+        for t = year:Years
+            %常规燃煤机组
+            for j = 1:size(x_gen_coal_1, 2)
+                Obj_inv = Obj_inv + A_gen(1) * I_gen_coal_1(i, j, year) / (1 + r)^(t - year);
             end
-        end       
+            for j = 1:size(x_gen_coal_2, 2)
+                Obj_inv = Obj_inv + A_gen(2) * I_gen_coal_2(i, j, year) / (1 + r)^(t - year);
+            end
+            for j = 1:size(x_gen_coal_3, 2)
+                Obj_inv = Obj_inv + A_gen(3) * I_gen_coal_3(i, j, year) / (1 + r)^(t - year);
+            end
+            for j = 1:size(x_gen_coal_4, 2)
+                Obj_inv = Obj_inv + A_gen(4) * I_gen_coal_4(i, j, year) / (1 + r)^(t - year);
+            end
+            %碳捕集机组
+            for j = 1:size(x_gen_coal_1, 2)
+                Obj_inv = Obj_inv + A_ccs(1) * I_gen_ccs_1(i, j, year) / (1 + r)^(t - year);
+            end
+            for j = 1:size(x_gen_coal_2, 2)
+                Obj_inv = Obj_inv + A_ccs(2) * I_gen_ccs_2(i, j, year) / (1 + r)^(t - year);
+            end
+            for j = 1:size(x_gen_coal_3, 2)
+                Obj_inv = Obj_inv + A_ccs(3) * I_gen_ccs_3(i, j, year) / (1 + r)^(t - year);
+            end
+            for j = 1:size(x_gen_coal_4, 2)
+                Obj_inv = Obj_inv + A_ccs(4) * I_gen_ccs_4(i, j, year) / (1 + r)^(t - year);
+            end
+            %燃气机组
+            for j = 1:size(x_gen_gas_1, 2)
+                Obj_inv = Obj_inv + A_gas(1) * I_gen_gas_1(i, j, year) / (1 + r)^(t - year);
+            end
+            for j = 1:size(x_gen_gas_2, 2)
+                Obj_inv = Obj_inv + A_gas(2) * I_gen_gas_2(i, j, year) / (1 + r)^(t - year);
+            end
+            for j = 1:size(x_gen_gas_3, 2)
+                Obj_inv = Obj_inv + A_gas(3) * I_gen_gas_3(i, j, year) / (1 + r)^(t - year);
+            end
+            for j = 1:size(x_gen_gas_4, 2)
+                Obj_inv = Obj_inv + A_gas(4) * I_gen_gas_4(i, j, year) / (1 + r)^(t - year);
+            end
+        end
+    end
 end
 %发电成本
 Obj_u = 0;
@@ -479,7 +479,7 @@ for t = 1:Hours
             ope_cost_coal = ope_cost_coal + sum(cost.*sum_type_g(i,:,t,y))*365;
             ope_cost_ccs = ope_cost_ccs + sum(cost_ccs.*sum_type_g_ccs(i,:,t,y))*365;
             ope_cost_gas = ope_cost_gas + sum(cost_gas.*sum_type_g_gas(i,:,t,y))*365;
-            
+
         end
         Obj_ope(2,t,y) = ope_cost_coal;
         Obj_ope(3,t,y) = ope_cost_ccs;
