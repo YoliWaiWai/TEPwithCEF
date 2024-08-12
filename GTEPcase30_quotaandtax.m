@@ -24,8 +24,7 @@ gen_node = [1,2,22,27,23];
 gen_c = setdiff(1:N, gen_node);
 gen_status = [1,1,1,1,1,0];
 l_status = zeros(L,1);
-l_E = [2,3,4,6,7,8,9,10,14,16,19,20,21,22,23,24,25,27,30,31,32,33,34,35,36,37,38]; % 已建设线路
-%l_E = (1:L);
+l_E = [1,2,3,5,4,6,7,8,9,10,11,12,13,14,16,19,20,21,22,23,24,25,26,27,30,31,32,33,34,35,36,37,38]; % 已建设线路
 l_c = setdiff((1:L),l_E); %待建设线路选项
 l_status(l_E)= 1;
 
@@ -104,8 +103,8 @@ for y = 1:Years
 end
 
 
-I = mpc.branch(:,F_BUS);
-J = mpc.branch(:,T_BUS);
+I = result.branch(:,1);
+J = result.branch(:,2);
 [Ainc] = makeIncidence(mpc); % branch-node incidence matrix
 In = Ainc'; % node-branch incidence matrix, but with all lines closed
 %生成一组24h负荷需求数据
@@ -122,19 +121,17 @@ P_load_min = min(P_load, [], 2);
 fprintf('线路潮流:\n');
 disp(result.branch(:, [1, 2, 14]));
 %% 绘图
-G = digraph(I,J);
+G = digraph(result.branch(:, 1),result.branch(:, 2),result.branch(:, 14)/Sbase);
 figure;
 h = plot(G, 'Layout', 'force', 'EdgeColor', 'k', 'NodeColor', 'b', 'MarkerSize', 8);
-h.EdgeLabel = result.branch(:, 14)/Sbase;
-highlight(h,I(l_status==1),J(l_status==1),'LineWidth',3,'EdgeColor','k'); %画出已建设线路
-highlight(h,I(l_status==0),J(l_status==0),'LineStyle','-.','LineWidth',1,'EdgeColor','b'); %画出待建设线路选项
-title('初始线路');
-
 % 设置节点坐标
 %          1，  2，3，4，5，  6，  7， 8，  9，10，11，12，13，14，15，16， 17，18，  19， 20，21，22，23，24，  25，  26，27，28，29
 h.XData = [0,  4, 2, 4, 10, 12, 12, 15, 10, 10, 7,  4,  1,  1, 4, 6,   8,  6,  8.5, 10, 11, 12, 7, 12, 10,  5.0, 7.5, 15, 1.0, 1.0];
 h.YData = [0, -3, 0, 0, -3,  0, -3,  0,  0,  3, 0,  3,  3,  7.5, 10, 5,  5, 7.5, 7.5, 7.5, 5, 3, 10, 10,   12.5, 12.5, 15, 15, 15, 10];
-
+highlight(h,I(l_status==1),J(l_status==1),'LineWidth',3,'EdgeColor','k'); %画出已建设线路
+highlight(h,I(l_status==0),J(l_status==0),'LineStyle','-.','LineWidth',1,'EdgeColor','b'); %画出待建设线路选项
+h.EdgeLabel = G.Edges.Weight;
+title('初始线路');
 for i = 1:size(mpc.gen, 1)
     node = mpc.gen(i, 1);
     power = mpc.gen(i, 2);
@@ -301,18 +298,18 @@ for year = 1:Years
     Cons = [Cons, x_gen_coal_4(:,:,year) + x_gen_ccs_4(:,:,year)<= 1];
 end
 % 只有[5,9,11,13,21,22,25,27,28]节点可以建设机组
-Cons = [Cons, x_gen_coal_1((~ismember(1:N,[5,9,11,13,21,22,25,27,28])),:,:) == 0];
-Cons = [Cons, x_gen_coal_2((~ismember(1:N,[5,9,11,13,21,22,25,27,28])),:,:) == 0];
-Cons = [Cons, x_gen_coal_3((~ismember(1:N,[5,9,11,13,21,22,25,27,28])),:,:) == 0];
-Cons = [Cons, x_gen_coal_4((~ismember(1:N,[5,9,11,13,21,22,25,27,28])),:,:) == 0];
-Cons = [Cons, x_gen_ccs_1((~ismember(1:N,[5,9,11,13,21,22,25,27,28])),:,:) == 0];
-Cons = [Cons, x_gen_ccs_2((~ismember(1:N,[5,9,11,13,21,22,25,27,28])),:,:) == 0];
-Cons = [Cons, x_gen_ccs_3((~ismember(1:N,[5,9,11,13,21,22,25,27,28])),:,:) == 0];
-Cons = [Cons, x_gen_ccs_4((~ismember(1:N,[5,9,11,13,21,22,25,27,28])),:,:) == 0];
-Cons = [Cons, x_gen_gas_1((~ismember(1:N,[5,9,11,13,21,22,25,27,28])),:,:) == 0];
-Cons = [Cons, x_gen_gas_2((~ismember(1:N,[5,9,11,13,21,22,25,27,28])),:,:) == 0];
-Cons = [Cons, x_gen_gas_3((~ismember(1:N,[5,9,11,13,21,22,25,27,28])),:,:) == 0];
-Cons = [Cons, x_gen_gas_4((~ismember(1:N,[5,9,11,13,21,22,25,27,28])),:,:) == 0];
+Cons = [Cons, x_gen_coal_1((~ismember(1:N,[9,11,13,21,22,25,27])),:,:) == 0];
+Cons = [Cons, x_gen_coal_2((~ismember(1:N,[9,11,13,21,22,25,27])),:,:) == 0];
+Cons = [Cons, x_gen_coal_3((~ismember(1:N,[9,11,13,21,22,25,27])),:,:) == 0];
+Cons = [Cons, x_gen_coal_4((~ismember(1:N,[9,11,13,21,22,25,27])),:,:) == 0];
+Cons = [Cons, x_gen_ccs_1((~ismember(1:N,[9,11,13,21,22,25,27])),:,:) == 0];
+Cons = [Cons, x_gen_ccs_2((~ismember(1:N,[9,11,13,21,22,25,27])),:,:) == 0];
+Cons = [Cons, x_gen_ccs_3((~ismember(1:N,[9,11,1321,22,25,27])),:,:) == 0];
+Cons = [Cons, x_gen_ccs_4((~ismember(1:N,[9,11,1321,22,25,27])),:,:) == 0];
+Cons = [Cons, x_gen_gas_1((~ismember(1:N,[21,22,25,27])),:,:) == 0];
+Cons = [Cons, x_gen_gas_2((~ismember(1:N,[21,22,25,27])),:,:) == 0];
+Cons = [Cons, x_gen_gas_3((~ismember(1:N,[21,22,25,27])),:,:) == 0];
+Cons = [Cons, x_gen_gas_4((~ismember(1:N,[21,22,25,27])),:,:) == 0];
 % 只有[1,4,7,10,13]年可以建设机组
 Cons = [Cons, x_gen_coal_1(:,:,(~ismember(1:Years,[1,4,7,10,13]))) == 0];
 Cons = [Cons, x_gen_coal_2(:,:,(~ismember(1:Years,[1,4,7,10,13]))) == 0];
