@@ -24,7 +24,7 @@ gen_node = [1,2,22,27,23];
 gen_c = setdiff(1:N, gen_node);
 gen_status = [1,1,1,1,1,0];
 l_status = zeros(L,1);
-l_E = [2,3,4,6,7,8,9,10,14,16,19,20,21,22,23,24,25,27,30,31,32,33,34,35,36,37,38]; % 已建设线路
+l_E = [1,2,3,5,4,6,7,8,9,10,11,12,13,14,16,19,20,21,22,23,24,25,26,27,30,31,32,33,34,35,36,37,38]; % 已建设线路
 %l_E = (1:L);
 l_c = setdiff((1:L),l_E); %待建设线路选项
 l_status(l_E)= 1;
@@ -63,12 +63,7 @@ I = mpc.branch(:,F_BUS);
 J = mpc.branch(:,T_BUS);
 [Ainc] = makeIncidence(mpc); % branch-node incidence matrix
 In = Ainc'; % node-branch incidence matrix, but with all lines closed
-% Cu_NL = [2 3 4 5]; % No-load cost of unit
-% Cup = [5 10 5 5]; % Startup cost of unit
-% Cdown = [5 10 5 5]; % Shutdown cost of unit
-% % Adding minimum up- and down-time
-% TUg = [6;15;1;1];  %minup
-% TDg = [3;6;3;3];   %mindown
+
 %生成一组24h负荷需求数据
 pd = mpc.bus(:,PD)/Sbase; %负荷需求标幺值
 System_demand = xlsread('gtepuc.xlsx',2,'B3:B26')/100;
@@ -83,19 +78,17 @@ P_load_min = min(P_load, [], 2);
 fprintf('线路潮流:\n');
 disp(result.branch(:, [1, 2, 14]));
 %% 绘图
-G = digraph(I,J);
+G = digraph(result.branch(:, 1),result.branch(:, 2),result.branch(:, 14)/Sbase);
 figure;
 h = plot(G, 'Layout', 'force', 'EdgeColor', 'k', 'NodeColor', 'b', 'MarkerSize', 8);
-h.EdgeLabel = result.branch(:, 14)/Sbase;
-highlight(h,I(l_status==1),J(l_status==1),'LineWidth',3,'EdgeColor','k'); %画出已建设线路
-highlight(h,I(l_status==0),J(l_status==0),'LineStyle','-.','LineWidth',1,'EdgeColor','b'); %画出待建设线路选项
-title('初始线路');
-
 % 设置节点坐标
 %          1，  2，3，4，5，  6，  7， 8，  9，10，11，12，13，14，15，16， 17，18，  19， 20，21，22，23，24，  25，  26，27，28，29
 h.XData = [0,  4, 2, 4, 10, 12, 12, 15, 10, 10, 7,  4,  1,  1, 4, 6,   8,  6,  8.5, 10, 11, 12, 7, 12, 10,  5.0, 7.5, 15, 1.0, 1.0];
 h.YData = [0, -3, 0, 0, -3,  0, -3,  0,  0,  3, 0,  3,  3,  7.5, 10, 5,  5, 7.5, 7.5, 7.5, 5, 3, 10, 10,   12.5, 12.5, 15, 15, 15, 10];
-
+highlight(h,I(l_status==1),J(l_status==1),'LineWidth',3,'EdgeColor','k'); %画出已建设线路
+highlight(h,I(l_status==0),J(l_status==0),'LineStyle','-.','LineWidth',1,'EdgeColor','b'); %画出待建设线路选项
+h.EdgeLabel = G.Edges.Weight;
+title('初始线路');
 for i = 1:size(mpc.gen, 1)
     node = mpc.gen(i, 1);
     power = mpc.gen(i, 2);
@@ -141,9 +134,7 @@ theta = sdpvar(N,Hours,Years);
 p = sdpvar(L,Hours,Years);
 pd_shed = sdpvar(N,Hours,Years);
 g_exist = sdpvar(N,Hours,Years);
-% u3 = binvar(N,x_coal_max(3),Hours,Years,'full');%节点N的第K台机组在t时段是否运行
-% v3 = binvar(N,x_coal_max(3),Hours,Years,'full');%节点N的第K台机组在t时刻是否开启
-% w3 = binvar(N,x_coal_max(3),Hours,Years,'full');%节点N的第K台机组在t时刻是否关停
+
 %燃煤机组
 g_coal_1 = sdpvar(N,x_coal_max(1),Hours,Years,'full');%节点N的第K台机组在t时段的输出功率
 g_coal_2 = sdpvar(N,x_coal_max(2),Hours,Years,'full');
@@ -334,10 +325,7 @@ for year = 1:Years
         end       
 end
 %发电成本
-Obj_u = 0;
-Obj_up = 0;
-Obj_down = 0;
-Obj_ope = sdpvar(Hours,Years);
+Obj_ope = sdpvar(3,Hours,Years);
 Cons = [Cons,sum_type_g(:,1,:,:) == sum(g_coal_1,2)];
 Cons = [Cons,sum_type_g(:,2,:,:) == sum(g_coal_2,2)];
 Cons = [Cons,sum_type_g(:,3,:,:) == sum(g_coal_3,2)];
@@ -346,24 +334,28 @@ Cons = [Cons,sum_type_g_ccs(:,1,:,:) == sum(g_ccs_1,2)];
 Cons = [Cons,sum_type_g_ccs(:,2,:,:) == sum(g_ccs_2,2)];
 Cons = [Cons,sum_type_g_ccs(:,3,:,:) == sum(g_ccs_3,2)];
 Cons = [Cons,sum_type_g_ccs(:,4,:,:) == sum(g_ccs_4,2)];
-
+ope_cost_coal = sdpvar(N,Hours,Years);
+ope_cost_ccs = sdpvar(N,Hours,Years);
+Obj_ope_total = 0;
 for t = 1:Hours
     for y = 1:Years
-        Obj_ope(t,y) = (M * sum(pd_shed(:,t,y)) + sum(cost(1).*g_exist(:,t,y)))*365;%原有机组发电成本
-        %新增机组发电成本
-        for i = 1:N
-            Obj_ope(t,y) = Obj_ope(t,y) + sum((cost+cei.*carbon_tax(y)).*sum_type_g(i,:,t,y))*365;
-            Obj_ope(t,y) = Obj_ope(t,y) + sum((cost_ccs+cei_ccs.*carbon_tax(y)).*sum_type_g_ccs(i,:,t,y))*365;
-            %Obj_u = Obj_u + sum(Cu_NL.*u(i,:,t));机组组合部分未改
-            %Obj_up = Obj_up + sum(Cup.*v(i,:,t));
-            %Obj_down = Obj_down + sum(Cdown.*w(i,:,t));
+            Obj_ope_total = Obj_ope_total + (M * sum(pd_shed(:,t,y)) + sum(cost(1).*g_exist(:,t,y)))*365;%原有机组发电成本
+        for i = 1:4
+            Obj_ope_total = Obj_ope_total + sum(sum(cost(i).*sum_type_g(:,i,t,y)))*365;
+            Obj_ope_total = Obj_ope_total + sum(sum(cost_ccs(i).*sum_type_g_ccs(:,i,t,y)))*365;            
         end
+
     end
-end
-Obj = Obj_inv + sum(sum(Obj_ope)); %+ Obj_u + Obj_up + Obj_down;
+end      
+
+
+
+%Obj = Obj_inv +Obj_ope_total ; %+ sum(sum(Obj_carbon_coal)) + sum(sum(Obj_carbon_ccs))+sum(sum(Obj_carbon_gas+ Obj_u + Obj_up + Obj_down;
+Obj = Obj_inv+Obj_ope_total;
 % Solve the problem
-ops = sdpsettings('verbose',2,'solver','gurobi');
+ops = sdpsettings('verbose',2,'solver','gurobi','gurobi.Heuristics',0.9);
 sol = optimize(Cons,Obj,ops);
+
 
 %% 规划结果
 s_x_lines = value(x_lines);
@@ -396,7 +388,15 @@ s_g_coal_2 = value(g_coal_2);
 s_g_coal_3 = value(g_coal_3);
 s_g_coal_4 = value(g_coal_4);
 s_sum_N_g = value(sum_N_g);
+sum_type_g(:,1,:,:) = sum(g_coal_1,2);
+sum_type_g(:,2,:,:) = sum(g_coal_2,2);
+sum_type_g(:,3,:,:) = sum(g_coal_3,2);
+sum_type_g(:,4,:,:) = sum(g_coal_4,2);
 s_sum_type_g = value(sum_type_g);
+sum_type_g_ccs(:,1,:,:) = sum(g_ccs_1,2);
+sum_type_g_ccs(:,2,:,:) = sum(g_ccs_2,2);
+sum_type_g_ccs(:,3,:,:) = sum(g_ccs_3,2);
+sum_type_g_ccs(:,4,:,:) = sum(g_ccs_4,2);
 s_sum_type_g_ccs = value(sum_type_g_ccs);
 
 s_g_exist = value(g_exist);
