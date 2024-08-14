@@ -1,5 +1,5 @@
 % 创建绘图函数
-function plotResults(year,Hours,s_Obj_ope,s_sum_type_g,s_sum_type_g_ccs,s_sum_type_g_gas,s_g_exist,s_pd_shed,P_load,s_I_lines,s_x_gen_coal_1,s_x_gen_coal_2,s_x_gen_coal_3,s_x_gen_coal_4,s_x_gen_ccs_1,s_x_gen_ccs_2,s_x_gen_ccs_3,s_x_gen_ccs_4,s_x_gen_gas_1,s_x_gen_gas_2,s_x_gen_gas_3,s_x_gen_gas_4,I,J,l_E)
+function plotResults(year,Hours,Obj_ope,s_sum_type_g,s_sum_type_g_ccs,s_sum_type_g_gas,s_g_exist,s_pd_shed,P_load,s_I_lines,s_x_gen_coal_1,s_x_gen_coal_2,s_x_gen_coal_3,s_x_gen_coal_4,s_x_gen_ccs_1,s_x_gen_ccs_2,s_x_gen_ccs_3,s_x_gen_ccs_4,s_x_gen_gas_1,s_x_gen_gas_2,s_x_gen_gas_3,s_x_gen_gas_4,I,J,l_E)
     N = size(P_load, 1);
 % 根据选择的年份绘制相应的图形
     subplot(2, 2, 1); % Change subplot to 2 rows and 2 columns
@@ -12,7 +12,7 @@ function plotResults(year,Hours,s_Obj_ope,s_sum_type_g,s_sum_type_g_ccs,s_sum_ty
     sum_type_g_all_gas = sum(sum_type_g_all_gas, 1);
     sum_g_exist = sum(s_g_exist, 1);
     sum_s_pd_shed = sum(s_pd_shed);
-    sum_type_g_all = [sum_g_exist; sum_type_g_all;sum_type_g_all_ccs; sum_type_g_all_gas;sum_s_pd_shed];
+    sum_type_g_all = [sum_g_exist; sum_type_g_all;sum_type_g_all_ccs;sum_type_g_all_gas;sum_s_pd_shed];%gas
     sum_type_g_all = sum_type_g_all(:,:,year)';
     h = bar(1:Hours, sum_type_g_all, 'stacked');
     hold on;
@@ -27,11 +27,11 @@ function plotResults(year,Hours,s_Obj_ope,s_sum_type_g,s_sum_type_g_ccs,s_sum_ty
     ylim([0, max_load*12]); 
 
     subplot(2, 2, 3); % Add a new subplot for operating cost
-    plot(1:Hours, sum(s_Obj_ope(:,:,year),1), 'b', 'LineWidth', 1.5);
+    plot(1:Hours, sum(Obj_ope(:,:,year),1), 'b', 'LineWidth', 1.5);
     xlabel('时段/h');
     ylabel('运行成本/万元');
     title(['第', num2str(year), '年运行成本']);
-    ylim([0, max(s_Obj_ope(:))+5]); % Set y-axis limit to start from 0
+
     % 绘制规划结果
     subplot(2, 2, [2, 4]); % Combine the last two subplots into one
     G = digraph(I,J);
