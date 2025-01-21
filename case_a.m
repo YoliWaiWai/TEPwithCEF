@@ -159,7 +159,7 @@ F=0;
 F = F + sum(C_loadcut) + sum(sum(C_H)) +sum(sum(C_k)) + sum(sum(C_R)) + sum(C_T) + sum(C_q);
 
  %% 求解器配置
-ops = sdpsettings('verbose',2,'solver','gurobi','gurobi.MIPGap',1e-6,'gurobi.Heuristics',0.9);
+ops = sdpsettings('verbose',2,'solver','gurobi','gurobi.MIPGap',1e-6,'gurobi.Heuristics',0.9,'gurobi.TuneTimeLimit',0);
 result = optimize(C,F,ops);
 s_F = value(F);
 s_F1 = value(sum(C_loadcut));

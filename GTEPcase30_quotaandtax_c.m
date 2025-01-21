@@ -429,48 +429,22 @@ end
 Obj_inv = 0;
 for year = 1:Years
     Obj_inv = Obj_inv + sum(c_lines .* x_lines(:,year));
-    for i = 1:N
-        for t = year:Years
-            %常规燃煤机组
-            for j = 1:size(x_gen_coal_1, 2)
-                Obj_inv = Obj_inv + A_gen(1) * I_gen_coal_1(i, j, year) / (1 + r)^(t - year);
-            end
-            for j = 1:size(x_gen_coal_2, 2)
-                Obj_inv = Obj_inv + A_gen(2) * I_gen_coal_2(i, j, year) / (1 + r)^(t - year);
-            end
-            for j = 1:size(x_gen_coal_3, 2)
-                Obj_inv = Obj_inv + A_gen(3) * I_gen_coal_3(i, j, year) / (1 + r)^(t - year);
-            end
-            for j = 1:size(x_gen_coal_4, 2)
-                Obj_inv = Obj_inv + A_gen(4) * I_gen_coal_4(i, j, year) / (1 + r)^(t - year);
-            end
-            %碳捕集机组
-            for j = 1:size(x_gen_coal_1, 2)
-                Obj_inv = Obj_inv + A_ccs(1) * I_gen_ccs_1(i, j, year) / (1 + r)^(t - year);
-            end
-            for j = 1:size(x_gen_coal_2, 2)
-                Obj_inv = Obj_inv + A_ccs(2) * I_gen_ccs_2(i, j, year) / (1 + r)^(t - year);
-            end
-            for j = 1:size(x_gen_coal_3, 2)
-                Obj_inv = Obj_inv + A_ccs(3) * I_gen_ccs_3(i, j, year) / (1 + r)^(t - year);
-            end
-            for j = 1:size(x_gen_coal_4, 2)
-                Obj_inv = Obj_inv + A_ccs(4) * I_gen_ccs_4(i, j, year) / (1 + r)^(t - year);
-            end
-            %燃气机组
-            for j = 1:size(x_gen_gas_1, 2)
-                Obj_inv = Obj_inv + A_gas(1) * I_gen_gas_1(i, j, year) / (1 + r)^(t - year);
-            end
-            for j = 1:size(x_gen_gas_2, 2)
-                Obj_inv = Obj_inv + A_gas(2) * I_gen_gas_2(i, j, year) / (1 + r)^(t - year);
-            end
-            for j = 1:size(x_gen_gas_3, 2)
-                Obj_inv = Obj_inv + A_gas(3) * I_gen_gas_3(i, j, year) / (1 + r)^(t - year);
-            end
-            for j = 1:size(x_gen_gas_4, 2)
-                Obj_inv = Obj_inv + A_gas(4) * I_gen_gas_4(i, j, year) / (1 + r)^(t - year);
-            end
-        end
+    for t = year:Years
+            %% 常规燃煤机组
+            Obj_inv = Obj_inv + A_gen(1) / (1 + r)^(t - year) * sum(sum(I_gen_coal_1(:, :, year)));
+            Obj_inv = Obj_inv + A_gen(2) / (1 + r)^(t - year) * sum(sum(I_gen_coal_2(:, :, year)));
+            Obj_inv = Obj_inv + A_gen(3) / (1 + r)^(t - year) * sum(sum(I_gen_coal_3(:, :, year)));
+            Obj_inv = Obj_inv + A_gen(4) / (1 + r)^(t - year) * sum(sum(I_gen_coal_4(:, :, year)));
+            %% 碳捕集机组
+            Obj_inv = Obj_inv + A_ccs(1) / (1 + r)^(t - year) * sum(sum(I_gen_ccs_1(:, :, year)));
+            Obj_inv = Obj_inv + A_ccs(2) / (1 + r)^(t - year) * sum(sum(I_gen_ccs_2(:, :, year)));
+            Obj_inv = Obj_inv + A_ccs(3) / (1 + r)^(t - year) * sum(sum(I_gen_ccs_3(:, :, year)));
+            Obj_inv = Obj_inv + A_ccs(4) / (1 + r)^(t - year) * sum(sum(I_gen_ccs_4(:, :, year)));
+            %% 燃气机组
+            Obj_inv = Obj_inv + A_gas(1) / (1 + r)^(t - year) * sum(sum(I_gen_gas_1(:, :, year)));
+            Obj_inv = Obj_inv + A_gas(2) / (1 + r)^(t - year) * sum(sum(I_gen_gas_2(:, :, year)));
+            Obj_inv = Obj_inv + A_gas(3) / (1 + r)^(t - year) * sum(sum(I_gen_gas_3(:, :, year)));
+            Obj_inv = Obj_inv + A_gas(4) / (1 + r)^(t - year) * sum(sum(I_gen_gas_4(:, :, year)));
     end
 end
 %发电成本
@@ -514,7 +488,7 @@ Obj_carbon_gas =  sum(sum(costofcarbon_gas .* sum_gas * 365));
 Obj = Obj_inv + Obj_ope_total + Obj_carbon_coal + Obj_carbon_ccs + Obj_carbon_gas; %+ Obj_u + Obj_up + Obj_down;
 %Obj = 0;
 % Solve the problem
-ops = sdpsettings('verbose',2,'solver','gurobi','gurobi.MIPGap',0.03,'gurobi.Heuristics',0.9);
+ops = sdpsettings('verbose',2,'solver','gurobi','gurobi.MIPGap',0.06,'gurobi.Heuristics',0.9);
 sol = optimize(Cons,Obj,ops);
 
 %% 规划结果
