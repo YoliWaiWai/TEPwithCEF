@@ -138,8 +138,8 @@ for t=1:24
     C = [C,0 <= V_R(t)<=V_CR]; % 富液体积
     C = [C,0 <= V_L(t)<=V_CR]; % 贫液体积
 end 
-%     C=[C,V_L0 == V_L(24)];% 贫液初始平衡
-%     C=[C,V_R0 == V_R(24)];% 富液初始平衡
+    C=[C,V_L0 == V_L(24)];% 贫液初始平衡
+    C=[C,V_R0 == V_R(24)];% 富液初始平衡
 for t=1:23
      C = [C,0 <= abs(V_R(t+1) - V_R(t))<= rate_max * P_yita]; % 流速
      C = [C,0 <= abs(V_L(t+1) - V_L(t))<= rate_max * P_yita]; % 流速

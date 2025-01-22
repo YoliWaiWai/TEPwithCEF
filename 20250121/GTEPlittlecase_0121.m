@@ -493,7 +493,7 @@ Obj_carbon_gas = sum(sum(cost_carbon_gas));
 Obj_carbon =  (Obj_carbon_coal + Obj_carbon_ccs + Obj_carbon_gas)* 365;
 Obj_q = sum(sum(C_q1 * 365));
 display('***机组发电/碳成本 计入完成！***')
-Obj = Obj_inv + Obj_ope_total + Obj_carbon + Obj_carbon_ccs + Obj_carbon_gas + Obj_q; %+ Obj_u + Obj_up + Obj_down;
+Obj = Obj_inv + Obj_ope_total + Obj_carbon + Obj_q; %+ Obj_u + Obj_up + Obj_down;
 display('***目标函数 表达式 建立完成！***')
 % Solve the problem
 ops = sdpsettings('verbose',2,'solver','gurobi','gurobi.MIPGap',0.05,'gurobi.Heuristics',0.9,'gurobi.TuneTimeLimit',0);
@@ -550,9 +550,11 @@ s_g_exist_w2 = value(g_exist_w2);
 s_Obj = value(Obj);
 s_Obj_inv = value(Obj_inv);
 s_Obj_ope = value(Obj_ope_total);
+s_Obj_carbon = value(Obj_carbon);
 s_Obj_carbon_coal= value(Obj_carbon_coal);
 s_Obj_carbon_ccs= value(Obj_carbon_ccs);
 s_Obj_carbon_gas= value(Obj_carbon_gas);
+s_Obj_q=value(Obj_q);
 Obj_inv_lines = 0;
 Obj_inv_coal = 0;
 Obj_inv_ccs = 0;
