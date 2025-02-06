@@ -150,7 +150,7 @@ F=0;
     C_loadcut(t) = 400 * abs(P_cut(t)); % 失负荷成本
     C_H(t) = a * P_G(t)* P_G(t) + b * P_G(t) + c; % 火电机组煤耗成本
     C_R(t) = K_R * fai * E_AB(t); % 溶剂损耗成本
-    C_T(t) = K_T * (E_G(t) - E_AB(t)- delta_h * P_G(t));% 碳交易成本 = 碳交易价格*（净碳排 - 配额碳排）
+    C_T(t) = K_T * (E_G(t) - E_AB(t)- del_h * P_G(t));% 碳交易成本 = 碳交易价格*（净碳排 - 配额碳排）
     C_q(t) = K_q *(P_predict(t) - P_w(t)); % 弃风惩罚成本
  end
  for t = 2:24

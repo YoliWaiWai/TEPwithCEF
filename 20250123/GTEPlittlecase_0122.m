@@ -5,21 +5,11 @@ close all
 clc
 define_constants; %打开这个函数可明确mpc的各个矩阵包含的信息，同时参见[1]
 % [1]Appendix B Data File Format, MATPWER User s Manual Version 7.1
-%2025.1.22更新：
-% 1.决策变量
-% x_trans_gexist = binvar(3,Years);
-% I_trans_gexist = binvar(3,Years);
-% 2.相关约束：
-% 2.1投资约束
-% 	1.i与x的关系
-% 	2.防止重复建设约束
-% 	3.可改造年份约束
-% 	4.发电容量充裕度约束
-% 2.2运行约束
-% 	1.机组出力范围变化
-% 3.目标函数
-% 运行成本和碳排放成本变化
-% 碳捕集机组按照固定碳排放计算
+%2025.1.23：
+% 将新建的碳捕集机组用变系数模型表示 总功率和实际碳相关 净输出功率和功率平衡方程相关
+% 注意:最大净输出功率变成了容量-碳捕集设备固定能耗，进行容量备用约束时要减去这部分能耗
+
+% 未完成：爬坡和启停;溶剂损耗
 %% ***********Parameters **********
 Years = 15; % Number of years
 Hours = 24; % Total number of hours
@@ -130,7 +120,29 @@ carbon_quota_gas = [0.3305 0.3288 0.3262 0.3240 0.3185 0.3164 0.3145 0.3128 0.31
 %生成一组24h负荷需求数据
 pd = mpc.bus(:,PD)/Sbase; %负荷需求标幺值
 pd_total = sum(pd);
-System_demand = xlsread('gtepuc.xlsx',2,'C3:C26')/Sbase;  
+System_demand = xlsread('gtepuc.xlsx',2,'C3:C26')/Sbase; 
+E_beta = 0.9; % 碳捕集效率
+delta_xz = 0.9;%烟气分流比限值
+P_yita = 1.05; % 再生塔和压缩机最大工作状态系数
+lamda_a = 0.0725;
+lamda_dc = 0.6525; % 单位捕碳量能耗
+M_MEA = 61.08; % M_MEA的摩尔质量
+M_co2 = 44; % 二氧化碳的摩尔质量
+theta_jx = 0.4; % 再生塔解析量
+CR = 40; % 醇胺溶液浓度(%)
+rou_R = 1.01; % 醇胺溶液密度
+V_CR = 30000; % 溶液储液装置容量
+V_R0 = 1000;%富液存储器初始体积
+V_L0 = 5000;%贫液存储器初始体积
+rate_max = 400;
+K_R = 1.17; % 乙醇胺溶剂成本系数
+fai = 1.5; % 溶剂运行损耗系数
+% 碳捕集设备固定能耗
+P_D1 = 10/Sbase; 
+P_BA_1 = P_D1.* ones(N,x_coal_max(1),Hours,Years);  
+P_BA_2 = P_D1.* ones(N,x_coal_max(2),Hours,Years);
+P_BA_3 = P_D1.* ones(N,x_coal_max(3),Hours,Years);  
+P_BA_4 = P_D1.* ones(N,x_coal_max(4),Hours,Years);
 % 风电预测功率
 P_predict23 = [299, 267, 280, 284, 329, 289, 168, 159, 186, 198, 131, 85, 58, 91, 116, 139, 149, 191, 267, 291, 300, 334, 353, 342]'/Sbase;
 P_predict27 = [339, 287, 449, 471, 512, 530, 527, 641, 634, 519, 401, 634, 589, 530, 512, 505, 206, 85, 81, 80, 83, 110, 353, 523]'/Sbase;
@@ -221,18 +233,86 @@ g_coal_4 = sdpvar(N,x_coal_max(4),Hours,Years,'full');
 sum_N_g = sdpvar(N,Hours,Years);%N个节点的机组输出功率
 sum_type_g = sdpvar(N,length(x_coal_max),Hours,Years,'full');%四种类型一共发了多少
 sum_coal = sdpvar(length(x_coal_max),Years);
-%碳捕集机组
-g_ccs_1 = sdpvar(N,x_coal_max(1),Hours,Years,'full');%节点N的第K台机组在t时段的输出功率
+%% 碳捕集机组运行决策变量
+%节点N的第K台机组在t时段的实际功率
+g_ccs_1 = sdpvar(N,x_coal_max(1),Hours,Years,'full');
 g_ccs_2 = sdpvar(N,x_coal_max(2),Hours,Years,'full');
 g_ccs_3 = sdpvar(N,x_coal_max(3),Hours,Years,'full');
 g_ccs_4 = sdpvar(N,x_coal_max(4),Hours,Years,'full');
-sum_N_g_ccs = sdpvar(N,Hours,Years);%6个节点的机组输出功率
+
 sum_type_g_ccs = sdpvar(N,length(x_coal_max),Hours,Years,'full');%四种类型一共发了多少
 sum_ccs = sdpvar(length(x_coal_max),Years);
+%节点N的第K台机组在t时段的净输出功率
+g_ccs_N_1 = sdpvar(N,x_coal_max(1),Hours,Years,'full');
+g_ccs_N_2 = sdpvar(N,x_coal_max(2),Hours,Years,'full');
+g_ccs_N_3 = sdpvar(N,x_coal_max(3),Hours,Years,'full');
+g_ccs_N_4 = sdpvar(N,x_coal_max(4),Hours,Years,'full');
+sum_N_g_ccs = sdpvar(N,Hours,Years);%各个节点的机组输出功率
+%节点N的第K台机组在t时段的碳捕集运行功率
+g_ccs_CC_1 = sdpvar(N,x_coal_max(1),Hours,Years,'full');
+g_ccs_CC_2 = sdpvar(N,x_coal_max(2),Hours,Years,'full');
+g_ccs_CC_3 = sdpvar(N,x_coal_max(3),Hours,Years,'full');
+g_ccs_CC_4 = sdpvar(N,x_coal_max(4),Hours,Years,'full');
+% 装置运行功率
+g_ccs_OP_1 = sdpvar(N,x_coal_max(1),Hours,Years,'full');
+g_ccs_OP_2 = sdpvar(N,x_coal_max(2),Hours,Years,'full');
+g_ccs_OP_3 = sdpvar(N,x_coal_max(3),Hours,Years,'full');
+g_ccs_OP_4 = sdpvar(N,x_coal_max(4),Hours,Years,'full');
+g_ccs_ab_1 = sdpvar(N,x_coal_max(1),Hours,Years,'full');
+g_ccs_ab_2 = sdpvar(N,x_coal_max(2),Hours,Years,'full');
+g_ccs_ab_3 = sdpvar(N,x_coal_max(3),Hours,Years,'full');
+g_ccs_ab_4 = sdpvar(N,x_coal_max(4),Hours,Years,'full');
+g_ccs_de_1 = sdpvar(N,x_coal_max(1),Hours,Years,'full');
+g_ccs_de_2 = sdpvar(N,x_coal_max(2),Hours,Years,'full');
+g_ccs_de_3 = sdpvar(N,x_coal_max(3),Hours,Years,'full');
+g_ccs_de_4 = sdpvar(N,x_coal_max(4),Hours,Years,'full');
+% 碳排放量
+E_ccs_1 = sdpvar(N,x_coal_max(1),Hours,Years,'full');
+E_ccs_2 = sdpvar(N,x_coal_max(2),Hours,Years,'full');
+E_ccs_3 = sdpvar(N,x_coal_max(3),Hours,Years,'full');
+E_ccs_4 = sdpvar(N,x_coal_max(4),Hours,Years,'full');
+E_ccs_ab_1 = sdpvar(N,x_coal_max(1),Hours,Years,'full');
+E_ccs_ab_2 = sdpvar(N,x_coal_max(2),Hours,Years,'full');
+E_ccs_ab_3 = sdpvar(N,x_coal_max(3),Hours,Years,'full');
+E_ccs_ab_4 = sdpvar(N,x_coal_max(4),Hours,Years,'full');
+E_ccs_de_1 = sdpvar(N,x_coal_max(1),Hours,Years,'full');
+E_ccs_de_2 = sdpvar(N,x_coal_max(2),Hours,Years,'full');
+E_ccs_de_3 = sdpvar(N,x_coal_max(3),Hours,Years,'full');
+E_ccs_de_4 = sdpvar(N,x_coal_max(4),Hours,Years,'full');
+E_ccs_liguid_1 = sdpvar(N,x_coal_max(1),Hours,Years,'full');
+E_ccs_liguid_2 = sdpvar(N,x_coal_max(2),Hours,Years,'full');
+E_ccs_liguid_3 = sdpvar(N,x_coal_max(3),Hours,Years,'full');
+E_ccs_liguid_4 = sdpvar(N,x_coal_max(4),Hours,Years,'full');
+E_ccs_NET_1 = sdpvar(N,x_coal_max(1),Hours,Years,'full');
+E_ccs_NET_2 = sdpvar(N,x_coal_max(2),Hours,Years,'full');
+E_ccs_NET_3 = sdpvar(N,x_coal_max(3),Hours,Years,'full');
+E_ccs_NET_4 = sdpvar(N,x_coal_max(4),Hours,Years,'full');
+% 溶液体积
+V_ab_1 = sdpvar(N,x_coal_max(1),Hours,Years,'full');
+V_ab_2 = sdpvar(N,x_coal_max(2),Hours,Years,'full');
+V_ab_3 = sdpvar(N,x_coal_max(3),Hours,Years,'full');
+V_ab_4 = sdpvar(N,x_coal_max(4),Hours,Years,'full');
+V_de_1 = sdpvar(N,x_coal_max(1),Hours,Years,'full');
+V_de_2 = sdpvar(N,x_coal_max(2),Hours,Years,'full');
+V_de_3 = sdpvar(N,x_coal_max(3),Hours,Years,'full');
+V_de_4 = sdpvar(N,x_coal_max(4),Hours,Years,'full');
+V_R_1 = sdpvar(N,x_coal_max(1),Hours,Years,'full');
+V_R_2 = sdpvar(N,x_coal_max(2),Hours,Years,'full');
+V_R_3 = sdpvar(N,x_coal_max(3),Hours,Years,'full');
+V_R_4 = sdpvar(N,x_coal_max(4),Hours,Years,'full');
+V_L_1 = sdpvar(N,x_coal_max(1),Hours,Years,'full');
+V_L_2 = sdpvar(N,x_coal_max(2),Hours,Years,'full');
+V_L_3 = sdpvar(N,x_coal_max(3),Hours,Years,'full');
+V_L_4 = sdpvar(N,x_coal_max(4),Hours,Years,'full');
+% 烟气分流比
+delta_1 = sdpvar(N,x_coal_max(1),Hours,Years,'full');
+delta_2 = sdpvar(N,x_coal_max(2),Hours,Years,'full');
+delta_3 = sdpvar(N,x_coal_max(3),Hours,Years,'full');
+delta_4 = sdpvar(N,x_coal_max(4),Hours,Years,'full');
+
 %燃气机组
 g_gas_1 = sdpvar(N,x_gas_max(1),Hours,Years,'full');%节点N的第K台机组在t时段的输出功率
 g_gas_2 = sdpvar(N,x_gas_max(2),Hours,Years,'full');
-
 sum_N_g_gas = sdpvar(N,Hours,Years);%N个节点的机组输出功率
 sum_type_g_gas = sdpvar(N,length(x_gas_max),Hours,Years,'full');%四种类型一共发了多少
 sum_gas = sdpvar(length(x_gas_max),Years);
@@ -353,7 +433,7 @@ for y = 1:Years
         Cons = [Cons,-(1 - I_lines(:,y)) * M <= In'*theta(:,h,y) - p(:,h,y).* xb];
         Cons = [Cons,In'*theta(:,h,y) - p(:,h,y).* xb <= (1 - I_lines(:,y)) * M];
         Cons = [Cons,sum_N_g(:,h,y) == sum(g_coal_1(:,:,h,y), 2) + sum(g_coal_2(:,:,h,y), 2) + sum(g_coal_3(:,:,h,y), 2) + sum(g_coal_4(:,:,h,y), 2)];%每个节点所有机组在某一时刻的总输出功率的变量
-        Cons = [Cons,sum_N_g_ccs(:,h,y) == sum(g_ccs_1(:,:,h,y), 2) + sum(g_ccs_2(:,:,h,y), 2) + sum(g_ccs_3(:,:,h,y), 2) + sum(g_ccs_4(:,:,h,y), 2)];%每个节点所有碳捕集机组在某一时刻的总输出功率的变量
+        Cons = [Cons,sum_N_g_ccs(:,h,y) == sum(g_ccs_N_1(:,:,h,y), 2) + sum(g_ccs_N_2(:,:,h,y), 2) + sum(g_ccs_N_3(:,:,h,y), 2) + sum(g_ccs_N_4(:,:,h,y), 2)];%每个节点所有碳捕集机组在某一时刻的总【净】输出功率的变量
         Cons = [Cons,sum_N_g_gas(:,h,y) == sum(g_gas_1(:,:,h,y), 2) + sum(g_gas_2(:,:,h,y), 2)];%每个节点所有燃气机组在某一时刻的总输出功率的变量
         Cons = [Cons,In * p(:,h,y) == sum_N_g(:,h,y) + sum_N_g_ccs(:,h,y) + sum_N_g_gas(:,h,y) + g_exist(:,h,y) - (P_load(:,h,y) - pd_shed(:,h,y)) ];
         Cons = [Cons,theta(1,h,y) == 0];
@@ -413,15 +493,15 @@ for i=1:N
         Cons = [Cons, g_coal_3(i,:,t,:) <= I_gen_coal_3(i,:,:) .* g_max_all(3)];
         Cons = [Cons, I_gen_coal_4(i,:,:) .* g_min_all(4) <= g_coal_4(i,:,t,:)];
         Cons = [Cons, g_coal_4(i,:,t,:) <= I_gen_coal_4(i,:,:) .* g_max_all(4)];
-
-        Cons = [Cons, I_gen_ccs_1(i,:,:) .* g_min_ccs(1) <= g_ccs_1(i,:,t,:)];
-        Cons = [Cons, g_ccs_1(i,:,t,:) <= I_gen_ccs_1(i,:,:) .* g_max_ccs(1)];
-        Cons = [Cons, I_gen_ccs_2(i,:,:) .* g_min_ccs(2) <= g_ccs_2(i,:,t,:)];
-        Cons = [Cons, g_ccs_2(i,:,t,:) <= I_gen_ccs_2(i,:,:) .* g_max_ccs(2)];
-        Cons = [Cons, I_gen_ccs_3(i,:,:) .* g_min_ccs(3) <= g_ccs_3(i,:,t,:)];
-        Cons = [Cons, g_ccs_3(i,:,t,:) <= I_gen_ccs_3(i,:,:) .* g_max_ccs(3)];
-        Cons = [Cons, I_gen_ccs_4(i,:,:) .* g_min_ccs(4) <= g_ccs_4(i,:,t,:)];
-        Cons = [Cons, g_ccs_4(i,:,t,:) <= I_gen_ccs_4(i,:,:) .* g_max_ccs(4)];
+        % 碳捕集电厂【总功率】的上限就是火电机组的上下限
+        Cons = [Cons, I_gen_ccs_1(i,:,:) .* g_min_all(1) <= g_ccs_1(i,:,t,:)];
+        Cons = [Cons, g_ccs_1(i,:,t,:) <= I_gen_ccs_1(i,:,:) .* g_max_all(1)];
+        Cons = [Cons, I_gen_ccs_2(i,:,:) .* g_min_all(2) <= g_ccs_2(i,:,t,:)];
+        Cons = [Cons, g_ccs_2(i,:,t,:) <= I_gen_ccs_2(i,:,:) .* g_max_all(2)];
+        Cons = [Cons, I_gen_ccs_3(i,:,:) .* g_min_all(3) <= g_ccs_3(i,:,t,:)];
+        Cons = [Cons, g_ccs_3(i,:,t,:) <= I_gen_ccs_3(i,:,:) .* g_max_all(3)];
+        Cons = [Cons, I_gen_ccs_4(i,:,:) .* g_min_all(4) <= g_ccs_4(i,:,t,:)];
+        Cons = [Cons, g_ccs_4(i,:,t,:) <= I_gen_ccs_4(i,:,:) .* g_max_all(4)];
 
         Cons = [Cons, I_gen_gas_1(i,:,:) .* g_min_gas(1) <= g_gas_1(i,:,t,:)];
         Cons = [Cons, g_gas_1(i,:,t,:) <= I_gen_gas_1(i,:,:) .* g_max_gas(1)];
@@ -429,8 +509,101 @@ for i=1:N
         Cons = [Cons, g_gas_2(i,:,t,:) <= I_gen_gas_2(i,:,:) .* g_max_gas(2)];
     end
 end
-display('*** 机组发电功率 相关约束 建立完成！***')
+% 碳捕集机组能量和二氧化碳流动关系
+    Cons = [Cons,g_ccs_1 == g_ccs_N_1 + g_ccs_CC_1]; % 机组输出总功率
+    Cons = [Cons,g_ccs_2 == g_ccs_N_2 + g_ccs_CC_2]; 
+    Cons = [Cons,g_ccs_3 == g_ccs_N_3 + g_ccs_CC_3]; 
+    Cons = [Cons,g_ccs_4 == g_ccs_N_4 + g_ccs_CC_4]; 
+    Cons = [Cons,g_ccs_CC_1 == P_BA_1 + g_ccs_OP_1]; % 碳捕集运行功率
+    Cons = [Cons,g_ccs_CC_2 == P_BA_2 + g_ccs_OP_2];
+    Cons = [Cons,g_ccs_CC_3 == P_BA_3 + g_ccs_OP_3];
+    Cons = [Cons,g_ccs_CC_4 == P_BA_4 + g_ccs_OP_4];
+    Cons = [Cons,g_ccs_ab_1 == lamda_a * E_ccs_ab_1]; % 碳捕集运行功率
+    Cons = [Cons,g_ccs_ab_2 == lamda_a * E_ccs_ab_2];
+    Cons = [Cons,g_ccs_ab_3 == lamda_a * E_ccs_ab_3];
+    Cons = [Cons,g_ccs_ab_4 == lamda_a * E_ccs_ab_4];
+    Cons = [Cons,g_ccs_de_1 == lamda_dc * E_ccs_de_1]; % 碳捕集运行功率
+    Cons = [Cons,g_ccs_de_2 == lamda_dc * E_ccs_de_2];
+    Cons = [Cons,g_ccs_de_3 == lamda_dc * E_ccs_de_3]; 
+    Cons = [Cons,g_ccs_de_4 == lamda_dc * E_ccs_de_4];    
+    Cons = [Cons,g_ccs_OP_1 == g_ccs_ab_1 + g_ccs_de_1]; % 碳捕集设备运行能耗
+    Cons = [Cons,g_ccs_OP_2 == g_ccs_ab_2 + g_ccs_de_2];
+    Cons = [Cons,g_ccs_OP_3 == g_ccs_ab_3 + g_ccs_de_3];
+    Cons = [Cons,g_ccs_OP_4 == g_ccs_ab_4 + g_ccs_de_4];
+    Cons = [Cons,E_ccs_1 == cei(1) * g_ccs_1];% 碳捕集机组产生的总碳排放
+    Cons = [Cons,E_ccs_2 == cei(2) * g_ccs_2];
+    Cons = [Cons,E_ccs_3 == cei(3) * g_ccs_3];
+    Cons = [Cons,E_ccs_4 == cei(4) * g_ccs_4];
+    Cons = [Cons,E_ccs_ab_1 ==  E_beta * delta_1 .* E_ccs_1]; % 机组捕获的二氧化碳总量
+    Cons = [Cons,E_ccs_ab_2 ==  E_beta * delta_2 .* E_ccs_2];
+    Cons = [Cons,E_ccs_ab_3 ==  E_beta * delta_3 .* E_ccs_3];
+    Cons = [Cons,E_ccs_ab_4 ==  E_beta * delta_4 .* E_ccs_4];
+    Cons = [Cons,E_ccs_NET_1 ==  (ones(N, x_coal_max(1), Hours, Years) - E_beta * delta_1) .* E_ccs_1]; % 净碳排
+    Cons = [Cons,E_ccs_NET_2 ==  (ones(N, x_coal_max(2), Hours, Years) - E_beta * delta_2) .* E_ccs_2];
+    Cons = [Cons,E_ccs_NET_3 ==  (ones(N, x_coal_max(3), Hours, Years) - E_beta * delta_3) .* E_ccs_3];
+    Cons = [Cons,E_ccs_NET_4 ==  (ones(N, x_coal_max(4), Hours, Years) - E_beta * delta_4) .* E_ccs_4];
+    Cons = [Cons, (1 - delta_xz ) * (ones(N, x_coal_max(1), Hours, Years)) <= delta_1 <= delta_xz * (ones(N, x_coal_max(1), Hours, Years))]; %烟气分流比限值约束
+    Cons = [Cons, (1 - delta_xz ) * (ones(N, x_coal_max(2), Hours, Years)) <= delta_2 <= delta_xz * (ones(N, x_coal_max(2), Hours, Years))];
+    Cons = [Cons, (1 - delta_xz ) * (ones(N, x_coal_max(3), Hours, Years)) <= delta_3 <= delta_xz * (ones(N, x_coal_max(3), Hours, Years))];
+    Cons = [Cons, (1 - delta_xz ) * (ones(N, x_coal_max(4), Hours, Years)) <= delta_4 <= delta_xz * (ones(N, x_coal_max(4), Hours, Years))];
+% 碳捕集装置约束
+    Cons = [Cons,V_ab_1 == (M_MEA * E_ccs_ab_1)*((M_co2 * theta_jx * CR/100 * rou_R)^(-1))]; % 电厂i的溶液存储器t时刻释放二氧化碳所需的溶液体积 注意单位换算
+    Cons = [Cons,V_ab_2 == (M_MEA * E_ccs_ab_2)*((M_co2 * theta_jx * CR/100 * rou_R)^(-1))];
+    Cons = [Cons,V_ab_3 == (M_MEA * E_ccs_ab_3)*((M_co2 * theta_jx * CR/100 * rou_R)^(-1))];
+    Cons = [Cons,V_ab_4 == (M_MEA * E_ccs_ab_4)*((M_co2 * theta_jx * CR/100 * rou_R)^(-1))];
+    Cons = [Cons,V_de_1 == (M_MEA * E_ccs_de_1)*((M_co2 * theta_jx * CR/100 * rou_R)^(-1))];
+    Cons = [Cons,V_de_2 == (M_MEA * E_ccs_de_2)*((M_co2 * theta_jx * CR/100 * rou_R)^(-1))];
+    Cons = [Cons,V_de_3 == (M_MEA * E_ccs_de_3)*((M_co2 * theta_jx * CR/100 * rou_R)^(-1))];
+    Cons = [Cons,V_de_4 == (M_MEA * E_ccs_de_4)*((M_co2 * theta_jx * CR/100 * rou_R)^(-1))];
+    Cons = [Cons,0 <= V_R_1 <= V_CR ]; % 富液体积
+    Cons = [Cons,0 <= V_R_2 <= V_CR ];
+    Cons = [Cons,0 <= V_R_3 <= V_CR ];
+    Cons = [Cons,0 <= V_R_4 <= V_CR ];
+    Cons = [Cons,0 <= V_L_1 <= V_CR ]; % 贫液体积
+    Cons = [Cons,0 <= V_L_2 <= V_CR ];
+    Cons = [Cons,0 <= V_L_3 <= V_CR ];
+    Cons = [Cons,0 <= V_L_4 <= V_CR ];
+    Cons = [Cons,V_L0 == V_L_1(:,:,24,:)];% 贫液初始平衡
+    Cons = [Cons,V_L0 == V_L_2(:,:,24,:)];
+    Cons = [Cons,V_L0 == V_L_3(:,:,24,:)];
+    Cons = [Cons,V_L0 == V_L_4(:,:,24,:)];
+    Cons = [Cons,V_R0 == V_R_1(:,:,24,:)];% 富液初始平衡
+    Cons = [Cons,V_R0 == V_R_2(:,:,24,:)];
+    Cons = [Cons,V_R0 == V_R_3(:,:,24,:)];
+    Cons = [Cons,V_R0 == V_R_4(:,:,24,:)];
+%     Cons = [Cons,V_R_1 == V_R0 * (ones(N, x_coal_max(1), Hours, Years)) + sum(V_ab_1 - V_de_1)]; % 富液变化
+%     Cons = [Cons,V_R_2 == V_R0 * (ones(N, x_coal_max(2), Hours, Years)) + sum(V_ab_2 - V_de_2)];
+%     Cons = [Cons,V_R_3 == V_R0 * (ones(N, x_coal_max(3), Hours, Years)) + sum(V_ab_3 - V_de_3)];
+%     Cons = [Cons,V_R_4 == V_R0 * (ones(N, x_coal_max(4), Hours, Years)) + sum(V_ab_4 - V_de_4)];
+%     Cons = [Cons,V_L_1 == V_L0 * (ones(N, x_coal_max(1), Hours, Years)) + sum(V_de_1 - V_ab_1)]; % 贫液变化
+%     Cons = [Cons,V_L_2 == V_L0 * (ones(N, x_coal_max(2), Hours, Years)) + sum(V_de_2 - V_ab_2)];
+%     Cons = [Cons,V_L_3 == V_L0 * (ones(N, x_coal_max(3), Hours, Years)) + sum(V_de_3 - V_ab_3)];
+%     Cons = [Cons,V_L_4 == V_L0 * (ones(N, x_coal_max(4), Hours, Years)) + sum(V_de_4 - V_ab_4)];
+    Cons = [Cons,E_ccs_liguid_1 >=  0];
+    Cons = [Cons,E_ccs_liguid_2 >=  0];
+    Cons = [Cons,E_ccs_liguid_3 >=  0];
+    Cons = [Cons,E_ccs_liguid_4 >=  0];
+ for t = 1:Hours
+     for i= 1:t 
+        Cons = [Cons,E_ccs_liguid_1(:,:,i,:) ==  sum(E_ccs_ab_1(:,:,1:i,:) - E_ccs_de_1(:,:,1:i,:))];
+        Cons = [Cons,E_ccs_liguid_2(:,:,i,:) ==  sum(E_ccs_ab_2(:,:,1:i,:) - E_ccs_de_2(:,:,1:i,:))];
+        Cons = [Cons,E_ccs_liguid_3(:,:,i,:) ==  sum(E_ccs_ab_3(:,:,1:i,:) - E_ccs_de_3(:,:,1:i,:))];
+        Cons = [Cons,E_ccs_liguid_4(:,:,i,:) ==  sum(E_ccs_ab_4(:,:,1:i,:) - E_ccs_de_4(:,:,1:i,:))];
+     end
+ end 
+ for t=1:23
+      Cons = [Cons,0 <= abs(V_R_1(:,:,t+1,:) - V_R_1(:,:,t,:))<= rate_max * P_yita]; % 流速
+      Cons = [Cons,0 <= abs(V_R_2(:,:,t+1,:) - V_R_2(:,:,t,:))<= rate_max * P_yita]; 
+      Cons = [Cons,0 <= abs(V_R_3(:,:,t+1,:) - V_R_3(:,:,t,:))<= rate_max * P_yita]; 
+      Cons = [Cons,0 <= abs(V_R_4(:,:,t+1,:) - V_R_4(:,:,t,:))<= rate_max * P_yita]; 
+      Cons = [Cons,0 <= abs(V_L_1(:,:,t+1,:) - V_L_1(:,:,t,:))<= rate_max * P_yita]; % 流速
+      Cons = [Cons,0 <= abs(V_L_2(:,:,t+1,:) - V_L_2(:,:,t,:))<= rate_max * P_yita];
+      Cons = [Cons,0 <= abs(V_L_3(:,:,t+1,:) - V_L_3(:,:,t,:))<= rate_max * P_yita];
+      Cons = [Cons,0 <= abs(V_L_4(:,:,t+1,:) - V_L_4(:,:,t,:))<= rate_max * P_yita];
+ end
 
+   
+display('*** 机组发电功率 相关约束 建立完成！***')
 %% Cons3: 系统日电力备用约束
 display('***开始建立 Cons3: 系统日电力备用约束！***')
 total_capacity_yearly = sdpvar(1,Years);
@@ -438,14 +611,14 @@ total_coal_ccs_capacity_y= sdpvar(1,Years);
 total_gas_capacity_y= sdpvar(1,Years);
 for y = 1:Years
     % 计算每年的总容量
-    Cons = [Cons,total_coal_ccs_capacity_y(y) == sum(sum(I_gen_coal_1(:,:,y),2)).*g_max_all(1) + sum(g_max_all(1) * (1 - I_trans_gexist(:,y)) + g_max_ccs(1) * I_trans_gexist(:,y))+...
+    Cons = [Cons,total_coal_ccs_capacity_y(y) == sum(sum(I_gen_coal_1(:,:,y),2)).*g_max_all(1) + sum(g_max_all(1) * (1 - I_trans_gexist(:,y)) + (g_max_all(1)-P_D1) * I_trans_gexist(:,y))+...
                                 sum(sum(I_gen_coal_2(:,:,y),2)).*g_max_all(2) + ...
                                 sum(sum(I_gen_coal_3(:,:,y),2)).*g_max_all(3) + ...
                                 sum(sum(I_gen_coal_4(:,:,y),2)).*g_max_all(4) + ...
-                                sum(sum(I_gen_ccs_1(:,:,y),2)).*g_max_all(1) + ...
-                                sum(sum(I_gen_ccs_2(:,:,y),2)).*g_max_all(2) + ...
-                                sum(sum(I_gen_ccs_3(:,:,y),2)).*g_max_all(3) + ...
-                                sum(sum(I_gen_ccs_4(:,:,y),2)).*g_max_all(4)];
+                                sum(sum(I_gen_ccs_1(:,:,y),2)).*(g_max_all(1)-P_D1) + ...
+                                sum(sum(I_gen_ccs_2(:,:,y),2)).*(g_max_all(2)-P_D1) + ...
+                                sum(sum(I_gen_ccs_3(:,:,y),2)).*(g_max_all(3)-P_D1) + ...
+                                sum(sum(I_gen_ccs_4(:,:,y),2)).*(g_max_all(4)-P_D1)];
     
     Cons = [Cons,total_gas_capacity_y(y) == sum(sum(I_gen_gas_1(:,:,y),2)).*g_max_gas(1) + ...
                            sum(sum(I_gen_gas_2(:,:,y),2)).*g_max_gas(2)];
@@ -513,7 +686,7 @@ for t = 1:Hours
         end
         for i = 1:4
             Obj_ope_total = Obj_ope_total + sum(sum(cost(i).*sum_type_g(:,i,t,y)))*365;%sum_type_g单位：100兆瓦时 cost单位：每100MW费用 总单位就是元
-            Obj_ope_total = Obj_ope_total + sum(sum(cost_ccs(i).*sum_type_g_ccs(:,i,t,y)))*365; 
+            Obj_ope_total = Obj_ope_total + sum(sum(cost(i).*sum_type_g_ccs(:,i,t,y)))*365; 
         end
         for i = 1:2
             Obj_ope_total = Obj_ope_total + sum(sum(cost_gas(i).*sum_type_g_gas(:,i,t,y)))*365; 
@@ -533,8 +706,13 @@ for y = 1:Years
     for i = 1:4
         quota_value = carbon_quota(min(i, 2), y);  % 当 i=1 时选择第1行，i=2,3,4 时选择第2行
         Cons = [Cons,cost_carbon_coal(i,y) == sum_coal(i, y) * (cei(i) - quota_value) * carbon_tax(y)];%第i种机组第y年的碳成本累加
-        Cons = [Cons,cost_carbon_ccs(i,y) == sum_ccs(i, y) * (cei_ccs(i) - quota_value) * carbon_tax(y)];
+        %Cons = [Cons,cost_carbon_ccs(i,y) == sum_ccs(i, y) * (cei(i) - quota_value) * carbon_tax(y)];
+        
     end
+    Cons = [Cons,cost_carbon_ccs(1,y) == sum(sum(sum((E_ccs_NET_1(:,:,:,y) - quota_value * g_ccs_1(:,:,:,y))))) * carbon_tax(y)];
+    Cons = [Cons,cost_carbon_ccs(2,y) == sum(sum(sum((E_ccs_NET_2(:,i,:,y) - quota_value * g_ccs_2(:,i,:,y))))) * carbon_tax(y)];
+    Cons = [Cons,cost_carbon_ccs(3,y) == sum(sum(sum((E_ccs_NET_3(:,i,:,y) - quota_value * g_ccs_3(:,i,:,y))))) * carbon_tax(y)];
+    Cons = [Cons,cost_carbon_ccs(4,y) == sum(sum(sum((E_ccs_NET_4(:,i,:,y) - quota_value * g_ccs_4(:,i,:,y))))) * carbon_tax(y)];
     for i = 1:2
         Cons = [Cons,cost_carbon_gas(i,y) == sum_gas(i, y) * (cei_gas(i) - carbon_quota_gas(y)) * carbon_tax(y)];
     end
