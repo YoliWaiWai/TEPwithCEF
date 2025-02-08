@@ -650,24 +650,24 @@ display('**Part I 结束**')
 display('**Part II 开始**')
 tic
 Obj_ope_total = 0;
+C_q1 = sdpvar(Hours,Years);
+Obj_ope_total=Obj_ope_total+ M* sum(sum(sum(pd_shed))); %切负荷成本 和原有机组发电成本，365最后统一乘
 for t = 1:Hours
     for y = 1:Years
-        Obj_ope_total = Obj_ope_total + (M * sum(pd_shed(:,t,y)) )*365;%切负荷成本 和 原有机组发电成本
-        C_q1(t,y) = K_q * ((P_predict23(t) - g_exist_w1(1, t, y)) + (P_predict27(t) - g_exist_w2(1, t, y))); % 弃风惩罚成本
+        Cons = [Cons, C_q1(t,y) == K_q * ((P_predict23(t) - g_exist_w1(1, t, y)) + (P_predict27(t) - g_exist_w2(1, t, y)))]; % 弃风惩罚成本
         for i = 1:length(gen_node)
             node = gen_node(i);
-            Obj_ope_total = Obj_ope_total + (1 - I_trans_gexist(i, year))* cost(1).* g_exist_c(node,t,y)*365 + ...
-                I_trans_gexist(i, year) * cost_ccs(1).* g_exist_c(node,t,y)*365;%原有燃煤机组考虑是否改造后的发电成本
+            Obj_ope_total = Obj_ope_total + ((1 - I_trans_gexist(i, year))* cost(1)+I_trans_gexist(i, year) * cost_ccs(1)).* g_exist_c(node,t,y);%原有燃煤机组考虑是否改造后的发电成本
         end
         for i = 1:4
-            Obj_ope_total = Obj_ope_total + sum(sum(cost(i).*sum_type_g(:,i,t,y)))*365;%sum_type_g单位：100兆瓦时 cost单位：每100MW费用 总单位就是元
-            Obj_ope_total = Obj_ope_total + sum(sum(cost(i).*sum_type_g_ccs(:,i,t,y)))*365;
+            Obj_ope_total = Obj_ope_total + sum(sum(cost(i).*(sum_type_g(:,i,t,y)+sum_type_g_ccs(:,i,t,y))));%sum_type_g单位：100兆瓦时 cost单位：每100MW费用 总单位就是元
         end
         for i = 1:2
-            Obj_ope_total = Obj_ope_total + sum(sum(cost_gas(i).*sum_type_g_gas(:,i,t,y)))*365;
+            Obj_ope_total = Obj_ope_total + sum(sum(cost_gas(i).*sum_type_g_gas(:,i,t,y)));
         end
     end
 end
+Obj_ope_total=Obj_ope_total*365;
 toc
 display('**Part II 结束**')
 
@@ -703,8 +703,8 @@ Obj_q = sum(sum(C_q1 * 365));
 toc
 display('**Part III 结束**')
 display('***机组发电/碳成本 计入完成！***')
-% Obj = Obj_inv + Obj_ope_total + Obj_carbon + Obj_q; %+ Obj_u + Obj_up + Obj_down;
-Obj = 0;
+Obj = Obj_inv + Obj_ope_total + Obj_carbon + Obj_q; %+ Obj_u + Obj_up + Obj_down;
+% Obj = 0;
 display('***目标函数 表达式 建立完成！***')
 % Solve the problem
 ops = sdpsettings('verbose',2,'solver','gurobi','gurobi.MIPGap',0.05,'gurobi.Heuristics',0.9,'gurobi.TuneTimeLimit',0);
