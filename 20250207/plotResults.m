@@ -1,5 +1,5 @@
 % 创建绘图函数
-function plotResults(year,Hours,cost_ope,s_sum_type_g,s_sum_type_g_ccs,s_sum_type_g_gas,s_g_exist,s_pd_shed,P_load,s_I_lines,s_x_gen_coal_1,s_x_gen_coal_2,s_x_gen_coal_3,s_x_gen_coal_4,s_x_gen_ccs_1,s_x_gen_ccs_2,s_x_gen_ccs_3,s_x_gen_ccs_4,s_x_gen_gas_1,s_x_gen_gas_2,s_x_gen_gas_3,s_x_gen_gas_4,I,J,l_E)
+function plotResults(year,Hours,cost_ope,s_sum_type_g,s_sum_type_g_ccs,s_sum_type_g_gas,s_g_exist,s_pd_shed,P_load,s_I_lines,s_x_gen_coal_1,s_x_gen_coal_2,s_x_gen_coal_3,s_x_gen_coal_4,s_x_gen_ccs_1,s_x_gen_ccs_2,s_x_gen_ccs_3,s_x_gen_ccs_4,s_x_gen_gas_1,s_x_gen_gas_2,I,J,l_E)
     N = size(P_load, 1);
 % 根据选择的年份绘制相应的图形
     subplot(2, 2, 1); % Change subplot to 2 rows and 2 columns
@@ -71,8 +71,6 @@ function plotResults(year,Hours,cost_ope,s_sum_type_g,s_sum_type_g_ccs,s_sum_typ
         if ismember(i, [5,9,11,13,21,22,25,27,28])
             num_gen1 = sum(s_x_gen_gas_1(i, :, year));   
             num_gen2 = sum(s_x_gen_gas_2(i, :, year)); 
-            num_gen3 = sum(s_x_gen_gas_3(i, :, year));   
-            num_gen4 = sum(s_x_gen_gas_4(i, :, year)); 
             label_str = sprintf('1型: %d\n2型: %d\n3型: %d\n4型: %d', num_gen1, num_gen2, num_gen3, num_gen4);
             text(h2.XData(i)+1.6, h2.YData(i)-0.1, label_str, 'HorizontalAlignment', 'right', 'VerticalAlignment', 'top', 'Color', 'b', 'FontSize', 8);
         end  
