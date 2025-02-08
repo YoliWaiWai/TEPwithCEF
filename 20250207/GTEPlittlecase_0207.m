@@ -703,8 +703,8 @@ Obj_q = sum(sum(C_q1 * 365));
 toc
 display('**Part III 结束**')
 display('***机组发电/碳成本 计入完成！***')
-% Obj = Obj_inv + Obj_ope_total + Obj_carbon + Obj_q; %+ Obj_u + Obj_up + Obj_down;
-Obj = 0;
+ Obj = Obj_inv + Obj_ope_total + Obj_carbon + Obj_q; %+ Obj_u + Obj_up + Obj_down;
+%Obj = 0;
 display('***目标函数 表达式 建立完成！***')
 % Solve the problem
 ops = sdpsettings('verbose',2,'solver','gurobi','gurobi.MIPGap',0.05,'gurobi.Heuristics',0.9,'gurobi.TuneTimeLimit',0);
