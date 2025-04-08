@@ -781,7 +781,7 @@ for t = 1:Hours
         for i = 1:length(gen_node)
             node = gen_node(i);
             Obj_ope_total = Obj_ope_total + (1 - I_trans_gexist(i, year))* cost(1).* g_exist_c(node,t,y)*365*3 + ...
-                I_trans_gexist(i, year) * cost_ccs(1).* g_exist_c(node,t,y)*365*3;%原有燃煤机组考虑是否改造后的发电成本
+                I_trans_gexist(i, year) * cost(1).* g_exist_c(node,t,y)*365*3;%原有燃煤机组考虑是否改造后的发电成本
         end
         for i = 1:4
             Obj_ope_total = Obj_ope_total + sum(sum(cost(i).*sum_type_g(:,i,t,y)))*365*3;%sum_type_g单位：100兆瓦时 cost单位：每100MW费用 总单位就是元
