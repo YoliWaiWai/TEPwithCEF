@@ -96,7 +96,7 @@ g_min_ccs = [0.45,0.35,0.30,0.25] .* g_max_all;%碳捕集电厂
 g_min_gas = g_max_gas * 0.50;
 x_coal_max = [4,5,1,3];%可规划的最大台数
 x_gas_max = [4,5];
-p_max = mpc.branch(:,RATE_A) * 2.5 / Sbase;%线路传输功率上限为750MW
+p_max = mpc.branch(:,RATE_A)*4/Sbase;       %线路传输功率上限
 xb = mpc.branch(:,BR_X); %线路电抗
 c_lines = xb*100;  %用线路电抗代表线路长度，得到线路建设成本c_lines
 %静态投资成本 单位：亿元
@@ -802,7 +802,7 @@ end
      C_qiting(5)= sum(sum(sum(uccs1(:,:,t,:) .* (1 - uccs1(:,:,t-1,:)) + uccs1(:,:,t-1,:) .* (1 - uccs1(:,:,t,:))))) * C_start(1);%燃煤1启停
      C_qiting(6)= sum(sum(sum(uccs2(:,:,t,:) .* (1 - uccs2(:,:,t-1,:)) + uccs2(:,:,t-1,:) .* (1 - u2(:,:,t,:))))) * C_start(2);%燃煤2启停
  end
-Obj_C_qiting = sum(C_qiting)*365*3;
+Obj_C_q = sum(C_qiting)*365*3;
 toc
 display('**Part II 结束**')
 
@@ -855,7 +855,7 @@ Obj_sale = sum(sum(sale_ccs))+sum(sum(sale_trans))*365*3;
 toc
 display('**Part III 结束**')
 display('***机组发电/碳成本 计入完成！***')
- Obj = Obj_inv + Obj_ope_total + Obj_carbon + Obj_q + Obj_C_qiting - Obj_sale; 
+ Obj = Obj_inv + Obj_ope_total + Obj_carbon + Obj_q + Obj_C_q - Obj_sale; 
 %Obj = 0;
 display('***目标函数 表达式 建立完成！***')
 % Solve the problem

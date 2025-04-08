@@ -20,15 +20,15 @@ function plotResults(year,Hours,cost_ope,s_sum_N_g,s_sum_N_g_ccs,s_sum_N_g_gas,s
     xlabel('时段/h');
     ylabel('机组出力/MW');
     legend('原有机组','燃煤机组','碳捕集机组','燃气机组','失负荷','负荷');
-    title(['第', num2str(year), '年机组出力情况']);
+    title(['第', num2str(year), '个规划期机组出力情况']);
     max_load = max(P_load(:));
     ylim([0, max_load*12]); 
 
     subplot(2, 2, 3); % Add a new subplot for operating cost
     plot(1:Hours, sum(cost_ope(:,:,year),1), 'b', 'LineWidth', 1.5);
     xlabel('时段/h');
-    ylabel('运行成本/万元');
-    title(['第', num2str(year), '年运行成本']);
+    ylabel('运行成本/元');
+    title(['第', num2str(year), '个规划期运行成本']);
 
     % 绘制规划结果
     subplot(2, 2, [2, 4]); % Combine the last two subplots into one
