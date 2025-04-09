@@ -17,6 +17,7 @@ define_constants; %打开这个函数可明确mpc的各个矩阵包含的信息�
 
 %% ***********Parameters **********
 Years = 5; % Number of years
+
 Hours = 24; % Total number of hours
 N = 30; % number of load nodes
 L = 41; % number of all lines
@@ -114,7 +115,8 @@ cost =     [0.3171,0.3171,0.2856,0.2856] * 1e5;   % 运行成本 单位：元/kW
 cost_ccs = 1.59 * cost;   % 运行成本 单位：元/kWh
 cost_gas = [0.432,0.396] * 1e5;
 K_q = 400;%弃风惩罚成本系数
-C_start = [100000,50000,40000,30000];
+%        300燃煤；600燃煤；180燃气；220燃气
+C_start = [50000,100000,30000,40000];
 % 碳排放强度 单位：t/MWh
 cei =     [0.905,0.856,0.798,0.794] * 1e2;
 cei_ccs = [0.171,0.162,0.145,0.141] * 1e2;
@@ -242,24 +244,37 @@ g_exist_w2 = sdpvar(1,Hours,Years);
 g_exist_w2_net = sdpvar(1,Hours,Years);
 g_exist_w2_ccs = sdpvar(1,Hours,Years);
 g_exist_toccs = sdpvar(N,Hours,Years);
+%机组组合相关变量
 u1 = binvar(N_new,x_coal_max(1),Hours,Years,'full');%节点N的第K台机组在t时段是否运行
-u2 = binvar(N_new,x_coal_max(2),Hours,Years,'full');%节点N的第K台机组在t时刻是否运行
-u3 = binvar(N_new,x_gas_max(1),Hours,Years,'full');%节点N的第K台机组在t时段是否运行
-u4 = binvar(N_new,x_gas_max(2),Hours,Years,'full');%节点N的第K台机组在t时刻是否运行
-uccs1 = binvar(N_new,x_coal_max(1),Hours,Years,'full');%节点N的第K台机组在t时段是否运行
-uccs2 = binvar(N_new,x_coal_max(2),Hours,Years,'full');%节点N的第K台机组在t时刻是否运行
-T_on1 = sdpvar(N_new, x_coal_max(1), Hours, Years, 'full');
-T_off1 = sdpvar(N_new, x_coal_max(1), Hours, Years, 'full');
-T_on2 = sdpvar(N_new, x_coal_max(2), Hours, Years, 'full');
-T_off2 = sdpvar(N_new, x_coal_max(2), Hours, Years, 'full');
-T_on3 = sdpvar(N_new, x_gas_max(1), Hours, Years, 'full');
-T_off3 = sdpvar(N_new, x_gas_max(1), Hours, Years, 'full');
-T_on4 = sdpvar(N_new, x_gas_max(2), Hours, Years, 'full');
-T_off4 = sdpvar(N_new, x_gas_max(2), Hours, Years, 'full');
-T_onccs1 = sdpvar(N_new, x_coal_max(1), Hours, Years, 'full');
-T_offccs1 = sdpvar(N_new, x_coal_max(1), Hours, Years, 'full');
-T_onccs2 = sdpvar(N_new, x_coal_max(2), Hours, Years, 'full');
-T_offccs2 = sdpvar(N_new, x_coal_max(2), Hours, Years, 'full');
+u2 = binvar(N_new,x_coal_max(2),Hours,Years,'full');
+u3 = binvar(N_new,x_gas_max(1),Hours,Years,'full');
+u4 = binvar(N_new,x_gas_max(2),Hours,Years,'full');
+uccs1 = binvar(N_new,x_coal_max(1),Hours,Years,'full');
+uccs2 = binvar(N_new,x_coal_max(2),Hours,Years,'full');
+v1 = binvar(N_new,x_coal_max(1),Hours,Years,'full');%开机
+v2 = binvar(N_new,x_coal_max(2),Hours,Years,'full');
+v3 = binvar(N_new,x_gas_max(1),Hours,Years,'full');
+v4 = binvar(N_new,x_gas_max(2),Hours,Years,'full');
+vccs1 = binvar(N_new,x_coal_max(1),Hours,Years,'full');
+vccs2 = binvar(N_new,x_coal_max(2),Hours,Years,'full');
+w1 = binvar(N_new,x_coal_max(1),Hours,Years,'full');%关机
+w2 = binvar(N_new,x_coal_max(2),Hours,Years,'full');
+w3 = binvar(N_new,x_gas_max(1),Hours,Years,'full');
+w4 = binvar(N_new,x_gas_max(2),Hours,Years,'full');
+wccs1 = binvar(N_new,x_coal_max(1),Hours,Years,'full');
+wccs2 = binvar(N_new,x_coal_max(2),Hours,Years,'full');
+% T_on1 = sdpvar(N_new, x_coal_max(1), Hours, Years, 'full');
+% T_off1 = sdpvar(N_new, x_coal_max(1), Hours, Years, 'full');
+% T_on2 = sdpvar(N_new, x_coal_max(2), Hours, Years, 'full');
+% T_off2 = sdpvar(N_new, x_coal_max(2), Hours, Years, 'full');
+% T_on3 = sdpvar(N_new, x_gas_max(1), Hours, Years, 'full');
+% T_off3 = sdpvar(N_new, x_gas_max(1), Hours, Years, 'full');
+% T_on4 = sdpvar(N_new, x_gas_max(2), Hours, Years, 'full');
+% T_off4 = sdpvar(N_new, x_gas_max(2), Hours, Years, 'full');
+% T_onccs1 = sdpvar(N_new, x_coal_max(1), Hours, Years, 'full');
+% T_offccs1 = sdpvar(N_new, x_coal_max(1), Hours, Years, 'full');
+% T_onccs2 = sdpvar(N_new, x_coal_max(2), Hours, Years, 'full');
+% T_offccs2 = sdpvar(N_new, x_coal_max(2), Hours, Years, 'full');
 %燃煤机组
 g_coal_1 = sdpvar(N_new,x_coal_max(1),Hours,Years,'full');%节点N的第K台机组在t时段的输出功率
 g_coal_2 = sdpvar(N_new,x_coal_max(2),Hours,Years,'full');
@@ -579,19 +594,6 @@ for i=1:N_new
     end
 end
 
-for n = 1:N_new
-    for y = 1:Years
-        for k = 1:x_gas_max(1)
-            % 计算每天的总开机时间
-            Cons = [Cons, sum(u3(n, k, :, y)) >= 9 * I_gen_gas_1(n, k, y)];
-        end
-        for k = 1:x_gas_max(2)
-            % 添加约束：每天总开机时间不少于9小时
-            Cons = [Cons, sum(u4(n, k, :, y)) >= 9 * I_gen_gas_2(n, k, y)];
-        end
-    end
-end
-
 Cons = [Cons,g_ccs_1 == g_ccs_1_net + g_ccs_1_ccs];
 Cons = [Cons,g_ccs_2 == g_ccs_2_net + g_ccs_2_ccs];
 Cons = [Cons,g_ccs_3 == g_ccs_3_net + g_ccs_3_ccs];
@@ -604,20 +606,17 @@ Cons = [Cons,g_ccs_1_ccs >= 0];
 Cons = [Cons,g_ccs_2_ccs >= 0];
 Cons = [Cons,g_ccs_3_ccs >= 0];
 Cons = [Cons,g_ccs_4_ccs >= 0];
-
 % 碳捕集机组产生的总碳排放
 % 当前代码可以保证未建设时总碳排也为零
 Cons = [Cons,E_ccs_1 == cei(1) * g_ccs_1];
 Cons = [Cons,E_ccs_2 == cei(2) * g_ccs_2];
 Cons = [Cons,E_ccs_3 == cei(3) * g_ccs_3];
 Cons = [Cons,E_ccs_4 == cei(4) * g_ccs_4];
-
 % 当前代码可以保证未建设时净碳排也为零
 Cons = [Cons,E_ccs_NET_1 == E_ccs_1 - E_ccs_ab_1]; % 净碳排
 Cons = [Cons,E_ccs_NET_2 == E_ccs_2 - E_ccs_ab_2];
 Cons = [Cons,E_ccs_NET_3 == E_ccs_3 - E_ccs_ab_3];
 Cons = [Cons,E_ccs_NET_4 == E_ccs_4 - E_ccs_ab_4];
-
 toc
 display('*** 机组发电功率 相关约束 建立完成！***')
 
@@ -654,24 +653,22 @@ display('*** 碳捕集装置 相关约束 建立完成！***')
 display('***开始建立 Cons3: 系统日电力备用约束！***')
 tic
 total_capacity_yearly = sdpvar(1,Years);
-total_coal_ccs_capacity_y= sdpvar(1,Years);
+total_coal_capacity_y = sdpvar(1,Years);
+total_ccs_capacity_y= sdpvar(1,Years);
 total_gas_capacity_y= sdpvar(1,Years);
 for y = 1:Years
     % 计算每年的总容量
-    Cons = [Cons,total_coal_ccs_capacity_y(y) == sum(sum(I_gen_coal_1(:,:,y),2)).*g_max_all(1) + sum(g_max_all(1) * (1 - I_trans_gexist(:,y)) + (g_max_all(1)-P_D1) * I_trans_gexist(:,y))+...
-        sum(sum(I_gen_coal_2(:,:,y),2)).*g_max_all(2) + ...
-        sum(sum(I_gen_coal_3(:,:,y),2)).*g_max_all(3) + ...
-        sum(sum(I_gen_coal_4(:,:,y),2)).*g_max_all(4) + ...
-        sum(sum(I_gen_ccs_1(:,:,y),2)).*(g_max_all(1)-P_D1) + ...
-        sum(sum(I_gen_ccs_2(:,:,y),2)).*(g_max_all(2)-P_D1) + ...
-        sum(sum(I_gen_ccs_3(:,:,y),2)).*(g_max_all(3)-P_D1) + ...
-        sum(sum(I_gen_ccs_4(:,:,y),2)).*(g_max_all(4)-P_D1)];
-
+    Cons = [Cons,total_coal_capacity_y(y) == sum(g_max_all(1) * (1 - I_trans_gexist(:,y))) + sum(sum(I_gen_coal_1(:,:,y),2)).*g_max_all(1) +...
+                                                sum(sum(I_gen_coal_2(:,:,y),2)).*g_max_all(2) + ...
+                                                sum(sum(I_gen_coal_3(:,:,y),2)).*g_max_all(3) + ...
+                                                sum(sum(I_gen_coal_4(:,:,y),2)).*g_max_all(4)];
+    Cons = [Cons,total_ccs_capacity_y(y) == sum(sum(I_gen_ccs_1(:,:,y),2)).*(g_max_all(1)-P_D1) + ...
+                                            sum(sum(I_gen_ccs_2(:,:,y),2)).*(g_max_all(2)-P_D1) + ...
+                                            sum(sum(I_gen_ccs_3(:,:,y),2)).*(g_max_all(3)-P_D1) + ...
+                                            sum(sum(I_gen_ccs_4(:,:,y),2)).*(g_max_all(4)-P_D1) + ...
+                                            sum(g_max_all(1)-P_D1) * I_trans_gexist(:,y)];
     Cons = [Cons,total_gas_capacity_y(y) == sum(sum(I_gen_gas_1(:,:,y),2)).*g_max_gas(1) + sum(sum(I_gen_gas_2(:,:,y),2)).*g_max_gas(2)];
-
-    Cons = [Cons,total_capacity_yearly(y) == total_coal_ccs_capacity_y(y) + total_gas_capacity_y(y)];
-
-
+    Cons = [Cons,total_capacity_yearly(y) == total_coal_capacity_y(y) + total_ccs_capacity_y(y) + total_gas_capacity_y(y)];
     % 系统容量备用约束
     Cons = [Cons, total_capacity_yearly(y) >= (1 + r_u) * P_load_max(y)];
 end
@@ -679,43 +676,31 @@ toc
 display('*** 系统日电力备用约束 建立完成！***')
 display('*** 开始建立 机组启停约束！***')
 tic
-for t = 2:Hours
-    % 更新连续开机与关停时间
-    Cons = [Cons, T_on1(:, :, t, :) == T_on1(:, :, t-1, :) + u1(:, :, t-1, :)];
-    Cons = [Cons, T_off1(:, :, t, :) == T_off1(:, :, t-1, :) + (1 - u1(:, :, t-1, :))];
-    % 启停约束
-    Cons = [Cons, (T_on1(:, :, t-1, :) - T_on_min) .* (u1(:, :, t-1, :) - u1(:, :, t, :)) >= 0];
-    Cons = [Cons, (T_off1(:, :, t-1, :) - T_off_min) .*  (u1(:, :, t, :) - u1(:, :, t-1, :)) >= 0];
-    % 更新连续开机与关停时间
-    Cons = [Cons, T_on2(:, :, t, :) == T_on2(:, :, t-1, :) + u2(:, :, t-1, :)];
-    Cons = [Cons, T_off2(:, :, t, :) == T_off2(:, :, t-1, :) + (1 - u2(:, :, t-1, :))];
-    % 启停约束
-    Cons = [Cons, (T_on2(:, :, t-1, :) - T_on_min) .*  (u2(:, :, t-1, :) - u2(:, :, t, :)) >= 0];
-    Cons = [Cons, (T_off2(:, :, t-1, :) - T_off_min) .* (u2(:, :, t, :) - u2(:, :, t-1, :)) >= 0];
-    % 更新连续开机与关停时间
-    Cons = [Cons, T_on3(:, :, t, :) == T_on3(:, :, t-1, :) + u3(:, :, t-1, :)];
-    Cons = [Cons, T_off3(:, :, t, :) == T_off3(:, :, t-1, :) + (1 - u3(:, :, t-1, :))];
-    % 启停约束
-    Cons = [Cons, (T_on3(:, :, t-1, :) - T_on_min) .*  (u3(:, :, t-1, :) - u3(:, :, t, :)) >= 0];
-    Cons = [Cons, (T_off3(:, :, t-1, :) - T_off_min) .*  (u3(:, :, t, :) - u3(:, :, t-1, :)) >= 0];
-    % 更新连续开机与关停时间
-    Cons = [Cons, T_on4(:, :, t, :) == T_on4(:, :, t-1, :) + u4(:, :, t-1, :)];
-    Cons = [Cons, T_off4(:, :, t, :) == T_off4(:, :, t-1, :) + (1 - u4(:, :, t-1, :))];
-    % 启停约束
-    Cons = [Cons, (T_on4(:, :, t-1, :) - T_on_min) .*  (u4(:, :, t-1, :) - u4(:, :, t, :)) >= 0];
-    Cons = [Cons, (T_off4(:, :, t-1, :) - T_off_min) .*  (u4(:, :, t, :) - u4(:, :, t-1, :)) >= 0];
-    % 更新连续开机与关停时间
-    Cons = [Cons, T_onccs1(:, :, t, :) == T_onccs1(:, :, t-1, :) + uccs1(:, :, t-1, :)];
-    Cons = [Cons, T_offccs1(:, :, t, :) == T_offccs1(:, :, t-1, :) + (1 - uccs1(:, :, t-1, :))];
-    % 启停约束
-    Cons = [Cons, (T_onccs1(:, :, t-1, :) - T_on_min) .*  (uccs1(:, :, t-1, :) - uccs1(:, :, t, :)) >= 0];
-    Cons = [Cons, (T_offccs1(:, :, t-1, :) - T_off_min) .*  (uccs1(:, :, t, :) - uccs1(:, :, t-1, :)) >= 0];
-    % 更新连续开机与关停时间
-    Cons = [Cons, T_onccs2(:, :, t, :) == T_onccs2(:, :, t-1, :) + uccs2(:, :, t-1, :)];
-    Cons = [Cons, T_offccs2(:, :, t, :) == T_offccs2(:, :, t-1, :) + (1 - uccs2(:, :, t-1, :))];
-    % 启停约束
-    Cons = [Cons, (T_onccs2(:, :, t-1, :) - T_on_min) .*  (uccs2(:, :, t-1, :) - uccs2(:, :, t, :)) >= 0];
-    Cons = [Cons, (T_offccs2(:, :, t-1, :) - T_off_min) .*  (uccs2(:, :, t, :) - uccs2(:, :, t-1, :)) >= 0];
+for t = T_on_min : Hours
+    start_idx = max(1, t - T_on_min + 1);
+    Cons = [Cons, sum(v1(:,:,start_idx:t,:), 3) <= u1(:,:,t,:)];
+    Cons = [Cons, sum(v2(:,:,start_idx:t,:), 3) <= u2(:,:,t,:)];
+    Cons = [Cons, sum(v3(:,:,start_idx:t,:), 3) <= u3(:,:,t,:)];
+    Cons = [Cons, sum(v4(:,:,start_idx:t,:), 3) <= u4(:,:,t,:)];
+    Cons = [Cons, sum(vccs1(:,:,start_idx:t,:), 3) <= uccs1(:,:,t,:)];
+    Cons = [Cons, sum(vccs2(:,:,start_idx:t,:), 3) <= uccs2(:,:,t,:)];
+end
+for t = T_off_min : Hours
+    start_idx = max(1, t - T_off_min + 1);
+    Cons = [Cons, sum(w1(:,:,start_idx:t,:), 3) <= 1 - u1(:,:,t,:)];
+    Cons = [Cons, sum(w2(:,:,start_idx:t,:), 3) <= 1 - u2(:,:,t,:)];
+    Cons = [Cons, sum(w3(:,:,start_idx:t,:), 3) <= 1 - u3(:,:,t,:)];
+    Cons = [Cons, sum(w4(:,:,start_idx:t,:), 3) <= 1 - u4(:,:,t,:)];
+    Cons = [Cons, sum(wccs1(:,:,start_idx:t,:), 3) <= 1 - uccs1(:,:,t,:)];
+    Cons = [Cons, sum(wccs2(:,:,start_idx:t,:), 3) <= 1 - uccs2(:,:,t,:)];
+end
+for t = 2 : Hours
+    Cons = [Cons,u1(:,:,t,:)-u1(:,:,t-1,:) == v1(:,:,t,:) - w1(:,:,t,:)];
+    Cons = [Cons,u2(:,:,t,:)-u2(:,:,t-1,:) == v2(:,:,t,:) - w2(:,:,t,:)];
+    Cons = [Cons,u3(:,:,t,:)-u3(:,:,t-1,:) == v3(:,:,t,:) - w3(:,:,t,:)];
+    Cons = [Cons,u4(:,:,t,:)-u4(:,:,t-1,:) == v4(:,:,t,:) - w4(:,:,t,:)];
+    Cons = [Cons,uccs1(:,:,t,:)-uccs1(:,:,t-1,:) == vccs1(:,:,t,:) - wccs1(:,:,t,:)];
+    Cons = [Cons,uccs2(:,:,t,:)-uccs2(:,:,t-1,:) == vccs2(:,:,t,:) - wccs2(:,:,t,:)];
 end
 toc
 display('*** 机组启停 建立完成！***')
@@ -855,7 +840,7 @@ Obj_sale = sum(sum(sale_ccs))+sum(sum(sale_trans))*365*3;
 toc
 display('**Part III 结束**')
 display('***机组发电/碳成本 计入完成！***')
- Obj = Obj_inv + Obj_ope_total + Obj_carbon + Obj_q + Obj_C_qiting - Obj_sale; 
+ Obj = Obj_inv + Obj_ope_total + Obj_ope_shed + Obj_carbon + Obj_q + Obj_C_qiting - Obj_sale; 
 %Obj = 0;
 display('***目标函数 表达式 建立完成！***')
 % Solve the problem
@@ -934,23 +919,25 @@ s_energy_ccs1 = value(energy_ccs1);
 s_energy_ccs2 = value(energy_ccs2);
 s_energy_ccs3 = value(energy_ccs3);
 s_energy_ccs4 = value(energy_ccs4);
-
+s_u1 = value(u1);
+s_u2 = value(u2);
+s_u3 = value(u3);
+s_u4 = value(u4);
+s_uccs1 = value(uccs1);
+s_uccs2 = value(uccs2);
 %装机容量
-s_total_capacity = zeros(3, Years);
-for y = 1:Years
-    s_total_capacity(1, y) = sum(sum(s_I_gen_coal_1(:, :, y))) * g_max_all(1) + sum(sum(s_I_gen_coal_2(:, :, y))) * g_max_all(2)+sum(sum(s_I_gen_coal_3(:, :, y))) * g_max_all(3)+sum(sum(s_I_gen_coal_4(:, :, y))) * g_max_all(4);
-    s_total_capacity(2, y) = sum(sum(s_I_gen_ccs_1(:, :, y))) * g_max_all(1) + sum(sum(s_I_gen_ccs_2(:, :, y))) * g_max_all(2)+sum(sum(s_I_gen_ccs_3(:, :, y))) * g_max_all(3)+sum(sum(s_I_gen_ccs_4(:, :, y))) * g_max_all(4);
-    s_total_capacity(3, y) = sum(sum(s_I_gen_gas_1(:, :, y))) * g_max_gas(1) + sum(sum(s_I_gen_gas_2(:, :, y))) * g_max_gas(2);
-end
-
+%！！！【注意】这部分计算中改造为碳捕集机组的容量算进碳捕集机组中！！！下面的展示数据逻辑比较乱 后面可以改
+s_total_coal_capacity_y = value(total_coal_capacity_y);
+s_total_ccs_capacity_y = value(total_ccs_capacity_y);
+s_total_gas_capacity_y = value(total_gas_capacity_y);
 % 发电成本
 cost_ope = zeros(4,Hours,Years);
 for t = 1:Hours
     for y = 1:Years
-        cost_ope(1,t,y) = sum(cost(1).*s_g_exist(:,t,y))*365*5;%原有机组发电成本
+        cost_ope(1,t,y) = sum(cost(1).*s_g_exist(:,t,y))*365*3;%原有机组发电成本
         for i = 1:4
             cost_ope(2,t,y) = cost_ope(2,t,y) + sum(sum(cost(i).*s_sum_type_g(:,i,t,y)))*365*3;
-            cost_ope(3,t,y) = cost_ope(3,t,y) + sum(sum(cost_ccs(i).*s_sum_type_g_ccs(:,i,t,y)))*365*3;
+            cost_ope(3,t,y) = cost_ope(3,t,y) + sum(sum(cost(i).*s_sum_type_g_ccs(:,i,t,y)))*365*3;
         end
         for i = 1:2
             cost_ope(4,t,y) = cost_ope(4,t,y) + sum(sum(cost_gas(i).*s_sum_type_g_gas(:,i,t,y)))*365*3;
@@ -980,7 +967,7 @@ carbon_emission_gas = sum(sum(s_sum_gas .* cei_gas'))*365*3;
 carbon_emission = carbon_emission_coal+carbon_emission_ccs+carbon_emission_gas;
 
 Results = zeros(5,4);
-Results(1,:) = [9,s_total_capacity(1,5),s_total_capacity(2,5),s_total_capacity(3,5)];
+Results(1,:) = [9,s_total_coal_capacity_y(1,5),s_total_ccs_capacity_y(1,5),s_total_gas_capacity_y(1,5)];
 Results(2,:) = [sum(sum(sum(s_g_exist_c))),sum(sum_s_sum_coal),sum(sum_s_sum_ccs),sum(sum_s_sum_gas)];%发电量
 Results(3,:) = Obj_ope_type';%运行成本
 Results(4,:) = [(sum(sum(carbon_emission_gexist))),carbon_emission_coal,carbon_emission_ccs,carbon_emission_gas];%碳排放量
