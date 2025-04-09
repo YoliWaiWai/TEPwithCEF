@@ -17,6 +17,7 @@ define_constants; %打开这个函数可明确mpc的各个矩阵包含的信息�
 
 %% ***********Parameters **********
 Years = 5; % Number of years
+period_length = 3;
 Hours = 24; % Total number of hours
 N = 30; % number of load nodes
 L = 41; % number of all lines
@@ -102,9 +103,9 @@ c_lines = xb*100;  %用线路电抗代表线路长度，得到线路建设成本
 %静态投资成本 单位：亿元
 c_gen = [12.9,22,37.5,45]' * 1e8;   % 四种不同类型的燃煤机组静态投资成本/亿元
 %c_gen_ccs = 0 * c_gen;
-c_gen_ccs = 1.182 * c_gen;        % 新建ccs成本
+c_gen_ccs = 1.382 * c_gen;        % 新建ccs成本
 c_gen_gas = [5.94,6.60]' * 1e8;
-c_gen_trans = 0.186 * c_gen;
+c_gen_trans = 0.386 * c_gen;
 A_gen = c_gen * annuity_factor;
 A_ccs = c_gen_ccs * annuity_factor;
 A_gas = c_gen_gas * annuity_factor;
@@ -250,30 +251,21 @@ u3 = binvar(N_new,x_gas_max(1),Hours,Years,'full');
 u4 = binvar(N_new,x_gas_max(2),Hours,Years,'full');
 uccs1 = binvar(N_new,x_coal_max(1),Hours,Years,'full');
 uccs2 = binvar(N_new,x_coal_max(2),Hours,Years,'full');
+u_ex = binvar(N,Hours,Years,'full');
 v1 = binvar(N_new,x_coal_max(1),Hours,Years,'full');%开机
 v2 = binvar(N_new,x_coal_max(2),Hours,Years,'full');
 v3 = binvar(N_new,x_gas_max(1),Hours,Years,'full');
 v4 = binvar(N_new,x_gas_max(2),Hours,Years,'full');
 vccs1 = binvar(N_new,x_coal_max(1),Hours,Years,'full');
 vccs2 = binvar(N_new,x_coal_max(2),Hours,Years,'full');
+v_ex = binvar(N,Hours,Years,'full');
 w1 = binvar(N_new,x_coal_max(1),Hours,Years,'full');%关机
 w2 = binvar(N_new,x_coal_max(2),Hours,Years,'full');
 w3 = binvar(N_new,x_gas_max(1),Hours,Years,'full');
 w4 = binvar(N_new,x_gas_max(2),Hours,Years,'full');
 wccs1 = binvar(N_new,x_coal_max(1),Hours,Years,'full');
 wccs2 = binvar(N_new,x_coal_max(2),Hours,Years,'full');
-% T_on1 = sdpvar(N_new, x_coal_max(1), Hours, Years, 'full');
-% T_off1 = sdpvar(N_new, x_coal_max(1), Hours, Years, 'full');
-% T_on2 = sdpvar(N_new, x_coal_max(2), Hours, Years, 'full');
-% T_off2 = sdpvar(N_new, x_coal_max(2), Hours, Years, 'full');
-% T_on3 = sdpvar(N_new, x_gas_max(1), Hours, Years, 'full');
-% T_off3 = sdpvar(N_new, x_gas_max(1), Hours, Years, 'full');
-% T_on4 = sdpvar(N_new, x_gas_max(2), Hours, Years, 'full');
-% T_off4 = sdpvar(N_new, x_gas_max(2), Hours, Years, 'full');
-% T_onccs1 = sdpvar(N_new, x_coal_max(1), Hours, Years, 'full');
-% T_offccs1 = sdpvar(N_new, x_coal_max(1), Hours, Years, 'full');
-% T_onccs2 = sdpvar(N_new, x_coal_max(2), Hours, Years, 'full');
-% T_offccs2 = sdpvar(N_new, x_coal_max(2), Hours, Years, 'full');
+w_ex = binvar(N,Hours,Years,'full');
 %燃煤机组
 g_coal_1 = sdpvar(N_new,x_coal_max(1),Hours,Years,'full');%节点N的第K台机组在t时段的输出功率
 g_coal_2 = sdpvar(N_new,x_coal_max(2),Hours,Years,'full');
@@ -482,6 +474,7 @@ tic
 gen_node = [1,2,22];
 gen_c = setdiff(1:N, gen_node);
 Cons = [Cons,g_exist_c(gen_c,:,:) == 0];%初始条件
+Cons = [Cons,u_ex(gen_c,:,:) == 0];
 for i = 1:length(gen_node)
     node = gen_node(i);
     for year = 1:Years
@@ -489,7 +482,7 @@ for i = 1:length(gen_node)
 %         Cons = [Cons, g_min_all(1) * (1 - I_trans_gexist(i, year)) + g_min_ccs(1) * I_trans_gexist(i, year) <= g_exist_c(node, :, year)];
 %         Cons = [Cons, g_exist_c(node, :, year) <= g_max_all(1) * (1 - I_trans_gexist(i, year)) + g_max_ccs(1) * I_trans_gexist(i, year)];
 %         改造后用可变运行方式计算：
-          Cons = [Cons, g_min_all(1) <= g_exist_c(node, :, year) <= g_max_all(1)];
+          Cons = [Cons, g_min_all(1) * u_ex(node, :, year) <= g_exist_c(node, :, year) <= g_max_all(1) * u_ex(node, :, year)];
     end
 end
 % 对于 23 和 27 节点，分别加入风电出力
@@ -675,7 +668,6 @@ toc
 display('*** 系统日电力备用约束 建立完成！***')
 display('*** 开始建立 机组启停约束！***')
 tic
-
 for t = T_on_min : Hours
     start_idx = max(1, t - T_on_min + 1);
     Cons = [Cons, sum(v1(:,:,start_idx:t,:), 3) <= u1(:,:,t,:)];
@@ -702,44 +694,6 @@ for t = 2 : Hours
     Cons = [Cons,uccs1(:,:,t,:)-uccs1(:,:,t-1,:) == vccs1(:,:,t,:) - wccs1(:,:,t,:)];
     Cons = [Cons,uccs2(:,:,t,:)-uccs2(:,:,t-1,:) == vccs2(:,:,t,:) - wccs2(:,:,t,:)];
 end
-% for t = 2:Hours
-%     % 更新连续开机与关停时间
-%     Cons = [Cons, T_on1(:, :, t, :) == T_on1(:, :, t-1, :) + u1(:, :, t-1, :)];
-%     Cons = [Cons, T_off1(:, :, t, :) == T_off1(:, :, t-1, :) + (1 - u1(:, :, t-1, :))];
-%     % 启停约束
-%     Cons = [Cons, (T_on1(:, :, t-1, :) - T_on_min) .* (u1(:, :, t-1, :) - u1(:, :, t, :)) >= 0];
-%     Cons = [Cons, (T_off1(:, :, t-1, :) - T_off_min) .*  (u1(:, :, t, :) - u1(:, :, t-1, :)) >= 0];
-%     % 更新连续开机与关停时间
-%     Cons = [Cons, T_on2(:, :, t, :) == T_on2(:, :, t-1, :) + u2(:, :, t-1, :)];
-%     Cons = [Cons, T_off2(:, :, t, :) == T_off2(:, :, t-1, :) + (1 - u2(:, :, t-1, :))];
-%     % 启停约束
-%     Cons = [Cons, (T_on2(:, :, t-1, :) - T_on_min) .*  (u2(:, :, t-1, :) - u2(:, :, t, :)) >= 0];
-%     Cons = [Cons, (T_off2(:, :, t-1, :) - T_off_min) .* (u2(:, :, t, :) - u2(:, :, t-1, :)) >= 0];
-%     % 更新连续开机与关停时间
-%     Cons = [Cons, T_on3(:, :, t, :) == T_on3(:, :, t-1, :) + u3(:, :, t-1, :)];
-%     Cons = [Cons, T_off3(:, :, t, :) == T_off3(:, :, t-1, :) + (1 - u3(:, :, t-1, :))];
-%     % 启停约束
-%     Cons = [Cons, (T_on3(:, :, t-1, :) - T_on_min) .*  (u3(:, :, t-1, :) - u3(:, :, t, :)) >= 0];
-%     Cons = [Cons, (T_off3(:, :, t-1, :) - T_off_min) .*  (u3(:, :, t, :) - u3(:, :, t-1, :)) >= 0];
-%     % 更新连续开机与关停时间
-%     Cons = [Cons, T_on4(:, :, t, :) == T_on4(:, :, t-1, :) + u4(:, :, t-1, :)];
-%     Cons = [Cons, T_off4(:, :, t, :) == T_off4(:, :, t-1, :) + (1 - u4(:, :, t-1, :))];
-%     % 启停约束
-%     Cons = [Cons, (T_on4(:, :, t-1, :) - T_on_min) .*  (u4(:, :, t-1, :) - u4(:, :, t, :)) >= 0];
-%     Cons = [Cons, (T_off4(:, :, t-1, :) - T_off_min) .*  (u4(:, :, t, :) - u4(:, :, t-1, :)) >= 0];
-%     % 更新连续开机与关停时间
-%     Cons = [Cons, T_onccs1(:, :, t, :) == T_onccs1(:, :, t-1, :) + uccs1(:, :, t-1, :)];
-%     Cons = [Cons, T_offccs1(:, :, t, :) == T_offccs1(:, :, t-1, :) + (1 - uccs1(:, :, t-1, :))];
-%     % 启停约束
-%     Cons = [Cons, (T_onccs1(:, :, t-1, :) - T_on_min) .*  (uccs1(:, :, t-1, :) - uccs1(:, :, t, :)) >= 0];
-%     Cons = [Cons, (T_offccs1(:, :, t-1, :) - T_off_min) .*  (uccs1(:, :, t, :) - uccs1(:, :, t-1, :)) >= 0];
-%     % 更新连续开机与关停时间
-%     Cons = [Cons, T_onccs2(:, :, t, :) == T_onccs2(:, :, t-1, :) + uccs2(:, :, t-1, :)];
-%     Cons = [Cons, T_offccs2(:, :, t, :) == T_offccs2(:, :, t-1, :) + (1 - uccs2(:, :, t-1, :))];
-%     % 启停约束
-%     Cons = [Cons, (T_onccs2(:, :, t-1, :) - T_on_min) .*  (uccs2(:, :, t-1, :) - uccs2(:, :, t, :)) >= 0];
-%     Cons = [Cons, (T_offccs2(:, :, t-1, :) - T_off_min) .*  (uccs2(:, :, t, :) - uccs2(:, :, t-1, :)) >= 0];
-% end
 toc
 display('*** 机组启停 建立完成！***')
 %% Obj: 计算投资成本
@@ -754,20 +708,20 @@ for year = 1:Years
     Obj_inv_line = Obj_inv_line + sum(c_lines .* x_lines(:,year));
     for t = year:Years
         %% 常规燃煤机组
-        Obj_inv_coal = Obj_inv_coal + A_gen(1) / (1 + r)^((t - year) * 3) * sum(sum(x_gen_coal_1(:, :, year)));
-        Obj_inv_coal = Obj_inv_coal + A_gen(2) / (1 + r)^((t - year) * 3) * sum(sum(x_gen_coal_2(:, :, year)));
-        Obj_inv_coal = Obj_inv_coal + A_gen(3) / (1 + r)^((t - year) * 3) * sum(sum(x_gen_coal_3(:, :, year)));
-        Obj_inv_coal = Obj_inv_coal + A_gen(4) / (1 + r)^((t - year) * 3) * sum(sum(x_gen_coal_4(:, :, year)));
+        Obj_inv_coal = Obj_inv_coal + A_gen(1) / (1 + r)^((t - year) * period_length) * sum(sum(x_gen_coal_1(:, :, year)));
+        Obj_inv_coal = Obj_inv_coal + A_gen(2) / (1 + r)^((t - year) * period_length) * sum(sum(x_gen_coal_2(:, :, year)));
+        Obj_inv_coal = Obj_inv_coal + A_gen(3) / (1 + r)^((t - year) * period_length) * sum(sum(x_gen_coal_3(:, :, year)));
+        Obj_inv_coal = Obj_inv_coal + A_gen(4) / (1 + r)^((t - year) * period_length) * sum(sum(x_gen_coal_4(:, :, year)));
         %% 碳捕集机组
-        Obj_inv_ccs = Obj_inv_ccs + A_ccs(1) / (1 + r)^((t - year) * 3) * sum(sum(x_gen_ccs_1(:, :, year)));
-        Obj_inv_ccs = Obj_inv_ccs + A_ccs(2) / (1 + r)^((t - year) * 3) * sum(sum(x_gen_ccs_2(:, :, year)));
-        Obj_inv_ccs = Obj_inv_ccs + A_ccs(3) / (1 + r)^((t - year) * 3) * sum(sum(x_gen_ccs_3(:, :, year)));
-        Obj_inv_ccs = Obj_inv_ccs + A_ccs(4) / (1 + r)^((t - year) * 3) * sum(sum(x_gen_ccs_4(:, :, year)));
+        Obj_inv_ccs = Obj_inv_ccs + A_ccs(1) / (1 + r)^((t - year) * period_length) * sum(sum(x_gen_ccs_1(:, :, year)));
+        Obj_inv_ccs = Obj_inv_ccs + A_ccs(2) / (1 + r)^((t - year) * period_length) * sum(sum(x_gen_ccs_2(:, :, year)));
+        Obj_inv_ccs = Obj_inv_ccs + A_ccs(3) / (1 + r)^((t - year) * period_length) * sum(sum(x_gen_ccs_3(:, :, year)));
+        Obj_inv_ccs = Obj_inv_ccs + A_ccs(4) / (1 + r)^((t - year) * period_length) * sum(sum(x_gen_ccs_4(:, :, year)));
         %% 燃气机组
-        Obj_inv_gas = Obj_inv_gas + A_gas(1) / (1 + r)^((t - year) * 3) * sum(sum(x_gen_gas_1(:, :, year)));
-        Obj_inv_gas = Obj_inv_gas + A_gas(2) / (1 + r)^((t - year) * 3) * sum(sum(x_gen_gas_2(:, :, year)));
+        Obj_inv_gas = Obj_inv_gas + A_gas(1) / (1 + r)^((t - year) * period_length) * sum(sum(x_gen_gas_1(:, :, year)));
+        Obj_inv_gas = Obj_inv_gas + A_gas(2) / (1 + r)^((t - year) * period_length) * sum(sum(x_gen_gas_2(:, :, year)));
         %% 改造
-        Obj_inv_trans = Obj_inv_trans + A_gen_trans(1) / (1 + r)^((t - year) * 3) * sum(x_trans_gexist(:,year));
+        Obj_inv_trans = Obj_inv_trans + A_gen_trans(1) / (1 + r)^((t - year) * period_length) * sum(x_trans_gexist(:,year));
     end
 end
 Obj_inv = Obj_inv_line+Obj_inv_coal+Obj_inv_ccs+Obj_inv_gas+Obj_inv_trans;
@@ -799,7 +753,7 @@ Obj_ope_total = 0;
 Obj_ope_shed = 0;
 for t = 1:Hours
     for y = 1:Years
-        Obj_ope_shed = Obj_ope_shed + (M * sum(pd_shed(:,t,y)) )*365*3;%切负荷成本 和 原有机组发电成本
+        Obj_ope_shed = Obj_ope_shed + (M * sum(pd_shed(:,t,y)) )*365*period_length;%切负荷成本 和 原有机组发电成本
         C_q1(t,y) = K_q * ((P_predict23(t) - g_exist_w1(1, t, y)) + (P_predict27(t) - g_exist_w2(1, t, y))); % 弃风惩罚成本
         for i = 1:length(gen_node)
             node = gen_node(i);
@@ -845,7 +799,7 @@ for y = 1:Years
     %     end
     %     灵活运行方式的碳成本这么计算：
     for i =1:3
-        Cons = [Cons,cost_carbon_gexist(i,y) ==  sum((cei(1) -  carbon_quota(2,y)) * (g_trans_ccs(i,:,y) + g_trans_net(i,:,y)) - E_trans_ab(i,:,y))];
+        Cons = [Cons,cost_carbon_gexist(i,y) ==  carbon_tax(y) * sum((cei(1) -  carbon_quota(2,y)) * (g_trans_ccs(i,:,y) + g_trans_net(i,:,y)) - E_trans_ab(i,:,y))];
         Cons = [Cons,sale_trans(i,y) ==  sum(E_trans_de(i,:,y)) * Carbon_dioxide_price];
     end
     for i = 1:4
@@ -860,11 +814,11 @@ for y = 1:Years
         Cons = [Cons,cost_carbon_gas(i,y) == sum_gas(i, y) * (cei_gas(i) - carbon_quota_gas(y)) * carbon_tax(y)];
     end
 end
-Obj_carbon_coal = sum(sum(cost_carbon_coal))* 365*3;
-Obj_carbon_ccs = sum(sum(cost_carbon_ccs))* 365*3;
-Obj_carbon_gas = sum(sum(cost_carbon_gas))* 365*3;
-Obj_carbon_gexist = sum(sum(cost_carbon_gexist))* 365*3;
-Obj_q = sum(sum(C_q1 * 365*3));%弃风惩罚成本
+Obj_carbon_coal = sum(sum(cost_carbon_coal))* 365*period_length;
+Obj_carbon_ccs = sum(sum(cost_carbon_ccs))* 365*period_length;
+Obj_carbon_gas = sum(sum(cost_carbon_gas))* 365*period_length;
+Obj_carbon_gexist = sum(sum(cost_carbon_gexist))* 365*period_length;
+Obj_q = sum(sum(C_q1 * 365*period_length));%弃风惩罚成本
 Obj_carbon =  Obj_carbon_coal + Obj_carbon_ccs + Obj_carbon_gas + Obj_carbon_gexist;%碳交易成本
 % 售碳成本
 sale_ccs = sdpvar(4,Years);
@@ -874,7 +828,7 @@ for y = 1:Years
     Cons = [Cons,sale_ccs(3,y) == sum(sum(sum(E_ccs_de_3(:,:,:,y))))* Carbon_dioxide_price];
     Cons = [Cons,sale_ccs(4,y) == sum(sum(sum(E_ccs_de_4(:,:,:,y))))* Carbon_dioxide_price];
 end
-Obj_sale = sum(sum(sale_ccs))+sum(sum(sale_trans))*365*3;
+Obj_sale = (sum(sum(sale_ccs))+sum(sum(sale_trans)))*365*period_length;
 toc
 display('**Part III 结束**')
 display('***机组发电/碳成本 计入完成！***')
@@ -964,7 +918,7 @@ s_u4 = value(u4);
 s_uccs1 = value(uccs1);
 s_uccs2 = value(uccs2);
 %装机容量
-%！！！注意这部分计算中改造为
+%！！！【注意】这部分计算中改造为碳捕集机组的容量算进碳捕集机组中！！！下面的展示数据逻辑比较乱 后面可以改
 s_total_coal_capacity_y = value(total_coal_capacity_y);
 s_total_ccs_capacity_y = value(total_ccs_capacity_y);
 s_total_gas_capacity_y = value(total_gas_capacity_y);
@@ -972,13 +926,13 @@ s_total_gas_capacity_y = value(total_gas_capacity_y);
 cost_ope = zeros(4,Hours,Years);
 for t = 1:Hours
     for y = 1:Years
-        cost_ope(1,t,y) = sum(cost(1).*s_g_exist(:,t,y))*365*5;%原有机组发电成本
+        cost_ope(1,t,y) = sum(cost(1).*s_g_exist(:,t,y))*365*3;%原有机组发电成本
         for i = 1:4
-            cost_ope(2,t,y) = cost_ope(2,t,y) + sum(sum(cost(i).*s_sum_type_g(:,i,t,y)))*365*3;
-            cost_ope(3,t,y) = cost_ope(3,t,y) + sum(sum(cost(i).*s_sum_type_g_ccs(:,i,t,y)))*365*3;
+            cost_ope(2,t,y) = cost_ope(2,t,y) + sum(sum(cost(i).*s_sum_type_g(:,i,t,y)))*365*period_length;
+            cost_ope(3,t,y) = cost_ope(3,t,y) + sum(sum(cost(i).*s_sum_type_g_ccs(:,i,t,y)))*365*period_length;
         end
         for i = 1:2
-            cost_ope(4,t,y) = cost_ope(4,t,y) + sum(sum(cost_gas(i).*s_sum_type_g_gas(:,i,t,y)))*365*3;
+            cost_ope(4,t,y) = cost_ope(4,t,y) + sum(sum(cost_gas(i).*s_sum_type_g_gas(:,i,t,y)))*365*period_length;
         end
     end
 end
@@ -994,14 +948,14 @@ cost_carbon_gexist_years = zeros(length(gen_node),y);
 for y = 1:Years
     for i = 1:length(gen_node)
         node = gen_node(i);
-        carbon_emission_gexist(i,y) = (sum(s_g_exist_c(node,:,y)) * ((1 - s_I_trans_gexist(i, y))* cei(1)  + s_I_trans_gexist(i, y) * cei_ccs(1)))*365*3;
-        cost_carbon_gexist_years(i,y) = sum(s_g_exist_c(node,:,y)) * ((1 - s_I_trans_gexist(i, y))*cei(1)  + s_I_trans_gexist(i, y) * cei_ccs(1) - carbon_quota(1,y)) * carbon_tax(y)*365*3;%原有燃煤机组考虑是否改造后
+        carbon_emission_gexist(i,y) = (sum(s_g_exist_c(node,:,y)) * ((1 - s_I_trans_gexist(i, y))* cei(1)  + s_I_trans_gexist(i, y) * cei_ccs(1)))*365*period_length;
+        cost_carbon_gexist_years(i,y) = sum(s_g_exist_c(node,:,y)) * ((1 - s_I_trans_gexist(i, y))*cei(1)  + s_I_trans_gexist(i, y) * cei_ccs(1) - carbon_quota(1,y)) * carbon_tax(y)*365*period_length;%原有燃煤机组考虑是否改造后
     end
 end
 %总碳排
-carbon_emission_coal = sum(sum(s_sum_coal .* cei'))*365*3;
-carbon_emission_ccs = sum(sum(sum(sum(s_E_ccs_NET_1,2)+sum(s_E_ccs_NET_2,2)+sum(s_E_ccs_NET_3,2)+sum(s_E_ccs_NET_4,2))))*365*3;
-carbon_emission_gas = sum(sum(s_sum_gas .* cei_gas'))*365*3;
+carbon_emission_coal = sum(sum(s_sum_coal .* cei'))*365*period_length;
+carbon_emission_ccs = sum(sum(sum(sum(s_E_ccs_NET_1,2)+sum(s_E_ccs_NET_2,2)+sum(s_E_ccs_NET_3,2)+sum(s_E_ccs_NET_4,2))))*365*period_length;
+carbon_emission_gas = sum(sum(s_sum_gas .* cei_gas'))*365*period_length;
 carbon_emission = carbon_emission_coal+carbon_emission_ccs+carbon_emission_gas;
 
 Results = zeros(5,4);
@@ -1030,7 +984,6 @@ year2Button = uicontrol(yearGroup, 'Style', 'radiobutton', 'String', '第2个规
 year3Button = uicontrol(yearGroup, 'Style', 'radiobutton', 'String', '第3个规划周期', 'Position', [260 20 100 30]);
 year4Button = uicontrol(yearGroup, 'Style', 'radiobutton', 'String', '第4个规划周期', 'Position', [380 20 100 30]);
 year5Button = uicontrol(yearGroup, 'Style', 'radiobutton', 'String', '第5个规划周期', 'Position', [500 20 100 30]);
-
 % 创建按钮回调函数
 set(year1Button, 'Callback', @(src, event) plotResults(1,Hours,cost_ope,s_sum_N_g,s_sum_N_g_ccs,s_sum_N_g_gas,s_g_exist,s_pd_shed,P_load,s_I_lines,s_x_gen_coal_1,s_x_gen_coal_2,s_x_gen_coal_3,s_x_gen_coal_4,s_x_gen_ccs_1,s_x_gen_ccs_2,s_x_gen_ccs_3,s_x_gen_ccs_4,s_x_gen_gas_1,s_x_gen_gas_2,I,J,l_E,N_new,gen_nodes_new));
 set(year2Button, 'Callback', @(src, event) plotResults(2,Hours,cost_ope,s_sum_N_g,s_sum_N_g_ccs,s_sum_N_g_gas,s_g_exist,s_pd_shed,P_load,s_I_lines,s_x_gen_coal_1,s_x_gen_coal_2,s_x_gen_coal_3,s_x_gen_coal_4,s_x_gen_ccs_1,s_x_gen_ccs_2,s_x_gen_ccs_3,s_x_gen_ccs_4,s_x_gen_gas_1,s_x_gen_gas_2,I,J,l_E,N_new,gen_nodes_new));
